@@ -813,9 +813,31 @@
         }
       }
 
+      function dropPowerup(x, y, dropRate) {
+        // dropRate: 0.4 = 40%, 0.25 = 25%, etc. Default is 40%
+        dropRate = dropRate || 0.4;
+        if (Math.random() > (1 - dropRate)) return;
+        var types = ['health', 'speed', 'shield'];
+        var type = types[Math.floor(Math.random() * types.length)];
+        var powerup = {
+          x: x,
+          y: y,
+          w: 15,
+          h: 15,
+          type: type,
+          vx: (Math.random() - 0.5) * 3,
+          vy: -5,
+          life: 300 // 5 seconds at 60fps
+        };
+        g.powerups.push(powerup);
+      }
+
       function genEn(p, i) {
         if (i < 5 || p.w < 150 || Math.random() > .5) return null;
-        var isHunter = Math.random() > 0.70;
+        var rand = Math.random();
+        var type = 'normal';
+        if (rand > 0.70) type = 'hunter';
+        else if (rand > 0.55) type = 'archer'; // 15% chance for archer
         var en = {
           x: p.x + p.w / 2,
           y: p.y - 40,
@@ -826,7 +848,7 @@
           pr: p.x + p.w,
           dead: 0,
           hp: 2,
-          type: isHunter ? 'hunter' : 'normal',
+          type: type,
           escaped: 0,
           vy: 0,
           gnd: 0,
@@ -836,12 +858,18 @@
           _pathTimer: 0,
           _thinkCooldown: 0,
           _jumpingTo: null,
-          _doubleJumpUsed: false
+          _doubleJumpUsed: false,
+          // archer state
+          _shootCooldown: 0
         };
-        if (isHunter) {
+        if (type === 'hunter') {
           en.hp = 3;
           en.speed = 3;
           en.jl = 2;
+        } else if (type === 'archer') {
+          en.hp = 2;
+          en.speed = 1.5;
+          en._shootCooldown = 0;
         }
         return en
       }
@@ -1035,6 +1063,7 @@
         g.obs = [];
         g.en = [];
         g.projectiles = [];
+        g.powerups = [];
         g.cam = 0;
         g.pgen = 1;
         g.hunters = [];
@@ -1366,7 +1395,8 @@
           y = e.y;
         ctx.save();
         var isHunter = e.type === 'hunter';
-        ctx.shadowColor = isHunter ? '#a855f7' : '#ef4444';
+        var isArcher = e.type === 'archer';
+        ctx.shadowColor = isHunter ? '#a855f7' : isArcher ? '#0ea5e9' : '#ef4444';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 1;
         // head with gradient
@@ -1374,6 +1404,9 @@
         if (isHunter) {
           grad.addColorStop(0, '#d946ef');
           grad.addColorStop(1, '#a855f7');
+        } else if (isArcher) {
+          grad.addColorStop(0, '#06b6d4');
+          grad.addColorStop(1, '#0891b2');
         } else {
           grad.addColorStop(0, '#f87171');
           grad.addColorStop(1, '#dc2626');
@@ -1383,7 +1416,7 @@
         ctx.arc(cx, y + 8, 8, 0, Math.PI * 2);
         ctx.fill();
         // outline
-        ctx.strokeStyle = isHunter ? '#7c3aed' : '#991b1b';
+        ctx.strokeStyle = isHunter ? '#7c3aed' : isArcher ? '#0369a1' : '#991b1b';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(cx, y + 8, 8, 0, Math.PI * 2);
@@ -1419,6 +1452,45 @@
           ctx.lineTo(cx - 7, y + 42);
           ctx.moveTo(cx, y + 32);
           ctx.lineTo(cx + 7, y + 42);
+          ctx.stroke();
+        } else if (isArcher) {
+          // archer has targeting reticle eyes
+          ctx.fillStyle = '#06b6d4';
+          ctx.beginPath();
+          ctx.arc(cx - 3, y + 6, 2, 0, Math.PI * 2);
+          ctx.arc(cx + 3, y + 6, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#0369a1';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(cx - 3, y + 6, 2.5, 0, Math.PI * 2);
+          ctx.arc(cx + 3, y + 6, 2.5, 0, Math.PI * 2);
+          ctx.stroke();
+          // archer body and bow
+          ctx.strokeStyle = '#0ea5e9';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(cx, y + 16);
+          ctx.lineTo(cx, y + 30);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(cx, y + 20);
+          ctx.lineTo(cx - 8, y + 26);
+          ctx.moveTo(cx, y + 20);
+          ctx.lineTo(cx + 8, y + 26);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(cx, y + 30);
+          ctx.lineTo(cx - 6, y + 40);
+          ctx.moveTo(cx, y + 30);
+          ctx.lineTo(cx + 6, y + 40);
+          ctx.stroke();
+          // draw bow in hand
+          ctx.strokeStyle = '#0891b2';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx + 12, y + 20, 5, 0, Math.PI * 2);
           ctx.stroke();
         } else {
           // regular enemy eyes
@@ -1704,6 +1776,11 @@
         var p = g.p;
         var cls = classes[selClass];
         var speedMul = 1 + ((g.upgrades && g.upgrades.speed) ? (0.08 * g.upgrades.speed) : 0);
+        // apply speed boost if active
+        if (p._speedBoost && p._speedBoost > 0) {
+          p._speedBoost--;
+          speedMul *= 1.4; // 40% faster
+        }
         var baseSpeed = 6 * speedMul;
         if (g.k.left) {
           p.vx = -baseSpeed;
@@ -1807,52 +1884,159 @@
             }
           }
         }
+        // arrow collision - player can jump on arrows
+        for (var i = 0; i < g.projectiles.length; i++) {
+          var pr = g.projectiles[i];
+          if ((pr.type === 'arrow' || pr.type === 'enemy_arrow') && p.vy >= 0) {
+            // arrow collision box (larger than visual for easier jumping)
+            var arrowCollision = {
+              x: pr.x - 10,
+              y: pr.y - 5,
+              w: 20,
+              h: 15
+            };
+            var playerBox = {
+              x: p.x,
+              y: p.y + p.h - 2,
+              w: p.w,
+              h: 4
+            };
+            if (coll(playerBox, arrowCollision)) {
+              p.y = pr.y - p.h - 5;
+              p.vy = 0;
+              p.gnd = 1;
+              p.jump = 0;
+              p.jl = cls.maxJumps;
+            }
+          }
+        }
         // enemies
         for (var i = 0; i < g.en.length; i++) {
           var e = g.en[i];
           if (e.dead) continue;
-          // hunter behavior: smarter platform-aware pathfinding with caching and jump planning
+          // hunter behavior: FSM-based AI with intelligent pathfinding and jump optimization
           if (e.type === 'hunter') {
             var speed = (e.speed || 2.2);
-            var dx = p.x - e.x;
-            var direction = dx > 0 ? 1 : -1;
             
-            // check if on a platform
-            var onPlat = false;
+            // Initialize FSM state if not set
+            if (!e._state) {
+              e._state = 'IDLE';
+              e._stateTimer = 0;
+              e._targetPlatIdx = null;
+              e._jumpPrediction = null;
+            }
+            
+            // Find current platform
+            var curPlIdx = -1;
             for (var j = 0; j < g.plat.length; j++) {
-              var pl = g.plat[j];
-              if (e.vy >= 0 && e.x + e.w > pl.x && e.x < pl.x + pl.w && Math.abs((e.y + e.h) - pl.y) < 5) {
-                onPlat = true;
+              if (e.x + e.w > g.plat[j].x && e.x < g.plat[j].x + g.plat[j].w && 
+                  Math.abs((e.y + e.h) - g.plat[j].y) < 8) {
+                curPlIdx = j;
                 break;
               }
             }
             
-            // simple behavior: chase toward player
-            if (onPlat && e.gnd) {
-              // on ground: move toward player or jump
+            var playerPlIdx = -1;
+            for (var j = 0; j < g.plat.length; j++) {
+              if (p.x + p.w > g.plat[j].x && p.x < g.plat[j].x + g.plat[j].w) {
+                playerPlIdx = j;
+                break;
+              }
+            }
+            
+            // FSM State Machine
+            if (e._state === 'IDLE' || e._state === 'CALCULATING') {
+              // Calculate best path to player using platform graph
+              if (curPlIdx !== -1 && playerPlIdx !== -1 && curPlIdx !== playerPlIdx) {
+                // Find safest path considering jump distances
+                var path = findOptimalHunterPath(curPlIdx, playerPlIdx, g.plat, e.jl);
+                if (path && path.length > 1) {
+                  e._targetPlatIdx = path[1];
+                  e._state = 'PURSUING';
+                  e._stateTimer = 0;
+                } else {
+                  e._state = 'IDLE';
+                }
+              } else if (playerPlIdx !== -1 && curPlIdx === playerPlIdx) {
+                // On same platform as player
+                e._state = 'ATTACKING';
+              } else {
+                e._state = 'IDLE';
+              }
+            }
+            
+            if (e._state === 'PURSUING' && e._targetPlatIdx !== null && e.gnd) {
+              var targetPl = g.plat[e._targetPlatIdx];
+              var targetCx = targetPl.x + targetPl.w / 2;
+              var hunterCx = e.x + e.w / 2;
+              var distToTarget = Math.abs(targetCx - hunterCx);
+              
+              // Move toward target platform
+              if (distToTarget > 20) {
+                e.vx = Math.sign(targetCx - hunterCx) * speed;
+              } else {
+                // At edge, attempt intelligent jump
+                if (e.jl > 0) {
+                  var jumpValid = canJump(g.plat[curPlIdx], targetPl);
+                  if (jumpValid) {
+                    e.vy = -13;
+                    e.gnd = 0;
+                    e.jl--;
+                    e._state = 'JUMPING';
+                    e._stateTimer = 0;
+                  }
+                }
+              }
+            }
+            
+            if (e._state === 'JUMPING') {
+              e._stateTimer++;
+              var targetCx = e._targetPlatIdx !== null ? g.plat[e._targetPlatIdx].x + g.plat[e._targetPlatIdx].w / 2 : p.x + p.w / 2;
+              var hunterCx = e.x + e.w / 2;
+              var distX = targetCx - hunterCx;
+              
+              // Mid-air steering
+              e.vx = Math.sign(distX) * speed * 1.2;
+              
+              // Smart double jump: use it if falling and far from target
+              if (e.jl > 0 && e.vy > 1) {
+                var targetPl = e._targetPlatIdx !== null ? g.plat[e._targetPlatIdx] : null;
+                if (targetPl && Math.abs(distX) > 60 && Math.abs(e.y - targetPl.y) > 40) {
+                  e.vy = -11;
+                  e.jl--;
+                }
+              }
+            }
+            
+            if (e._state === 'ATTACKING') {
+              // Chase player on same platform
               var px = p.x + p.w / 2;
               var ex = e.x + e.w / 2;
               var distX = Math.abs(px - ex);
               
-              // if far from player, walk toward them
-              if (distX > 50) {
-                e.vx = Math.sign(px - ex) * speed * 0.8;
-              } else if (e.jl > 0 && distX < 200) {
-                // if close, try jumping toward player
-                e.vy = -13;
-                e.gnd = 0;
-                e.jl--;
-                e.vx = Math.sign(px - ex) * speed;
+              if (distX > 30) {
+                e.vx = Math.sign(px - ex) * speed * 1.2;
               } else {
                 e.vx = 0;
               }
-            } else {
-              // in air: continue horizontal movement, maybe jump again
-              e.vx = Math.sign(dx) * speed * 1.1;
-              if (e.vy > 2 && e.jl > 0 && Math.abs(dx) < 150) {
-                e.vy = -11;
-                e.jl--;
+              
+              // Recalculate if player jumps to different platform
+              if (playerPlIdx !== curPlIdx && playerPlIdx !== -1) {
+                e._state = 'CALCULATING';
               }
+            }
+            
+            // Fallback: simple pursuit if state breaks
+            if (e._state === 'IDLE' || !e._state) {
+              var dx = p.x - e.x;
+              e.vx = Math.sign(dx) * speed * 0.8;
+            }
+            
+            // Air control
+            if (!e.gnd && e.vy > 2) {
+              e.vx = Math.sign(e._targetPlatIdx !== null ? 
+                (g.plat[e._targetPlatIdx].x + g.plat[e._targetPlatIdx].w / 2) - (e.x + e.w / 2) : 
+                p.x - e.x) * speed;
             }
 
             // apply physics
@@ -1875,6 +2059,66 @@
                 }
               }
             }
+          } else if (e.type === 'archer') {
+            // archer enemy: patrols and shoots at player
+            var speed = e.speed || 1.5;
+            var dx = p.x - e.x;
+            
+            // simple patrol
+            e.x += e.vx;
+            if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
+            
+            // keep aligned to platform
+            var plIdx = findPlatformIndexAtX(e.x, e.w);
+            if (plIdx !== -1) {
+              e.y = g.plat[plIdx].y - e.h;
+              e.gnd = 1;
+            }
+            
+            // shooting behavior: fire at player periodically
+            e._shootCooldown--;
+            if (e._shootCooldown <= 0 && Math.abs(dx) < 500) {
+              // calculate angle to player
+              var ex = e.x + e.w / 2;
+              var ey = e.y + e.h / 2;
+              var py = p.y + 20;
+              var angle = Math.atan2(py - ey, (p.x - g.cam + 15) - (ex - g.cam));
+              var arrowSpeed = 8;
+              var vx = Math.cos(angle) * arrowSpeed;
+              var vy = Math.sin(angle) * arrowSpeed;
+              
+              var arrow = {
+                x: ex,
+                y: ey,
+                vx: vx,
+                vy: vy,
+                w: 10,
+                h: 4,
+                life: 100,
+                type: 'enemy_arrow',
+                rot: angle,
+                power: 0.5
+              };
+              g.projectiles.push(arrow);
+              e._shootCooldown = 60 + Math.floor(Math.random() * 40); // shoot every ~1-1.7 seconds
+            }
+            
+            // apply physics
+            e.vy = (e.vy || 0) + 0.6;
+            e.y += e.vy;
+            
+            // landing detection
+            e.gnd = 0;
+            for (var j = 0; j < g.plat.length; j++) {
+              var pl = g.plat[j];
+              if (e.vy >= 0 && e.x + e.w > pl.x && e.x < pl.x + pl.w && e.y + e.h >= pl.y && e.y + e.h <= pl.y + pl.h + 15) {
+                if (pl.spikes) {
+                  e.dead = 1;
+                } else {
+                  e.y = pl.y - e.h; e.vy = 0; e.gnd = 1;
+                }
+              }
+            }
           } else {
             // simple patrol behavior
             e.x += e.vx;
@@ -1894,6 +2138,7 @@
               g.sc += (e.type === 'hunter' ? 500 : 200);
               upSc();
               coinSound();
+              dropPowerup(e.x + e.w / 2, e.y);
               if (e.type === 'hunter') {
                 g.hunters = g.hunters.filter(function(h) {
                   return h !== e
@@ -1933,30 +2178,92 @@
           pr.x += pr.vx;
           pr.y += (pr.vy || 0);
           pr.life--;
-          for (var j = 0; j < g.en.length; j++) {
-            var e = g.en[j];
-            if (e.dead) continue;
-            if (coll({
+          
+          // player arrow hits enemies
+          if (pr.type === 'arrow') {
+            for (var j = 0; j < g.en.length; j++) {
+              var e = g.en[j];
+              if (e.dead) continue;
+              if (coll({
+                  x: pr.x,
+                  y: pr.y,
+                  w: pr.w,
+                  h: pr.h
+                }, e)) {
+                // Damage scales: fully charged shot deals 5 damage, otherwise 1
+                var base = (pr.power && pr.power >= 1) ? 5 : 1;
+                var dmgMul = 1 + ((g.upgrades && g.upgrades.damage) ? (0.5 * g.upgrades.damage) : 0);
+                var dmg = Math.max(1, Math.round(base * dmgMul));
+                e.hp = (e.hp || 1) - dmg;
+                pr.life = 0;
+                if (e.hp <= 0) {
+                  e.dead = 1;
+                  g.sc += 150;
+                  upSc();
+                  coinSound();
+                  dropPowerup(e.x + e.w / 2, e.y, 0.25); // 25% drop rate for arrow kills
+                }
+              }
+            }
+          }
+          // enemy arrow hits player
+          else if (pr.type === 'enemy_arrow') {
+            if (!p.dead && coll({
                 x: pr.x,
                 y: pr.y,
                 w: pr.w,
                 h: pr.h
-              }, e)) {
-              // Damage scales: fully charged shot deals 5 damage, otherwise 1
-              var base = (pr.power && pr.power >= 1) ? 5 : 1;
-              var dmgMul = 1 + ((g.upgrades && g.upgrades.damage) ? (0.5 * g.upgrades.damage) : 0);
-              var dmg = Math.max(1, Math.round(base * dmgMul));
-              e.hp = (e.hp || 1) - dmg;
+              }, {
+                x: p.x + 5,
+                y: p.y + 5,
+                w: p.w - 10,
+                h: p.h - 5
+              })) {
+              p.hp--;
+              p.inv = 90;
+              upHp();
+              damageSound();
               pr.life = 0;
-              if (e.hp <= 0) {
-                e.dead = 1;
-                g.sc += 150;
-                upSc();
-                coinSound()
-              }
+              if (p.hp <= 0) endGame()
             }
           }
+          
           if (pr.life <= 0) g.projectiles.splice(i, 1)
+        }
+        // powerup physics and collision
+        for (var i = g.powerups.length - 1; i >= 0; i--) {
+          var pu = g.powerups[i];
+          pu.life--;
+          pu.vy += 0.4; // gravity
+          pu.y += pu.vy;
+          pu.x += pu.vx;
+          pu.vx *= 0.98; // friction
+          
+          // platform collision - bounce or land
+          for (var j = 0; j < g.plat.length; j++) {
+            var pl = g.plat[j];
+            if (pu.vy >= 0 && pu.x + pu.w > pl.x && pu.x < pl.x + pl.w && pu.y + pu.h >= pl.y && pu.y + pu.h <= pl.y + pl.h + 15) {
+              pu.y = pl.y - pu.h;
+              pu.vy *= -0.3; // bounce
+              if (Math.abs(pu.vy) < 0.5) pu.vy = 0;
+            }
+          }
+          
+          // player collision - apply powerup
+          if (coll({x: p.x + 5, y: p.y + 5, w: p.w - 10, h: p.h - 5}, pu)) {
+            if (pu.type === 'health') {
+              var maxHp = classes[selClass].hp + (g.upgrades ? (g.upgrades.health || 0) : 0);
+              p.hp = Math.min(p.hp + 2, maxHp);
+              upHp();
+            } else if (pu.type === 'speed') {
+              p._speedBoost = 120; // 2 seconds of speed
+            } else if (pu.type === 'shield') {
+              p.inv = 180; // 3 seconds of invincibility
+            }
+            g.powerups.splice(i, 1);
+          } else if (pu.life <= 0) {
+            g.powerups.splice(i, 1);
+          }
         }
         for (var i = 0; i < g.coinItems.length; i++) {
           var co = g.coinItems[i];
@@ -2024,10 +2331,59 @@
         for (var i = 0; i < g.coins.length; i++) drawCoin(g.coins[i], t, g.cam);
         for (var i = 0; i < g.obs.length; i++) drawObs(g.obs[i], g.cam);
         for (var i = 0; i < g.en.length; i++) drawEn(g.en[i], g.cam);
+        // draw powerups
+        for (var i = 0; i < g.powerups.length; i++) {
+          var pu = g.powerups[i];
+          var x = pu.x - g.cam;
+          var y = pu.y;
+          ctx.save();
+          // spinning animation
+          var angle = (t / 10) % (Math.PI * 2);
+          ctx.translate(x + pu.w / 2, y + pu.h / 2);
+          ctx.rotate(angle);
+          
+          if (pu.type === 'health') {
+            // red health cross
+            ctx.fillStyle = '#ef4444';
+            ctx.shadowColor = '#dc2626';
+            ctx.shadowBlur = 8;
+            ctx.fillRect(-2, -6, 4, 12);
+            ctx.fillRect(-6, -2, 12, 4);
+          } else if (pu.type === 'speed') {
+            // yellow lightning bolt
+            ctx.fillStyle = '#eab308';
+            ctx.shadowColor = '#ca8a04';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.moveTo(0, -7);
+            ctx.lineTo(3, -1);
+            ctx.lineTo(1, -1);
+            ctx.lineTo(4, 7);
+            ctx.lineTo(-1, 2);
+            ctx.lineTo(0, 2);
+            ctx.closePath();
+            ctx.fill();
+          } else if (pu.type === 'shield') {
+            // cyan shield star
+            ctx.fillStyle = '#06b6d4';
+            ctx.shadowColor = '#0891b2';
+            ctx.shadowBlur = 8;
+            for (var s = 0; s < 5; s++) {
+              var angle = (s * Math.PI * 2 / 5) - Math.PI / 2;
+              var px = Math.cos(angle) * 7;
+              var py = Math.sin(angle) * 7;
+              if (s === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.restore();
+        }
         for (var i = 0; i < g.projectiles.length; i++) {
           var pr = g.projectiles[i];
           ctx.save();
-          if (pr.type === 'arrow') {
+          if (pr.type === 'arrow' || pr.type === 'enemy_arrow') {
             // draw rotated arrow projectile
             var px = pr.x - g.cam,
               py = pr.y;
@@ -2035,10 +2391,10 @@
             ctx.translate(px + pr.w / 2, py + pr.h / 2);
             ctx.rotate(ang);
             // shaft
-            ctx.fillStyle = '#f3f4f6';
+            ctx.fillStyle = pr.type === 'enemy_arrow' ? '#ef4444' : '#f3f4f6';
             ctx.fillRect(-2, -1, 20, 2);
             // fletching
-            ctx.fillStyle = '#f59e0b';
+            ctx.fillStyle = pr.type === 'enemy_arrow' ? '#dc2626' : '#f59e0b';
             ctx.beginPath();
             ctx.moveTo(-2, -1);
             ctx.lineTo(-6, -5);
@@ -2046,7 +2402,7 @@
             ctx.closePath();
             ctx.fill();
             // head
-            ctx.fillStyle = '#374151';
+            ctx.fillStyle = pr.type === 'enemy_arrow' ? '#b91c1c' : '#374151';
             ctx.beginPath();
             ctx.moveTo(18, 0);
             ctx.lineTo(14, -4);

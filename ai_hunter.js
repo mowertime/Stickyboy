@@ -101,6 +101,67 @@
     return { dir: dir, next: null };
   };
 
+  // FSM-based optimal pathfinding considering jump capability
+  window.findOptimalHunterPath = function(startIdx, targetIdx, platforms, jumpCount) {
+    if (!platforms || startIdx === -1 || targetIdx === -1) return null;
+    if (startIdx === targetIdx) return [startIdx];
+    
+    // Use Dijkstra with cost favoring paths reachable with available jumps
+    var visited = {};
+    var distances = {};
+    var previous = {};
+    
+    for (var i = 0; i < platforms.length; i++) {
+      distances[i] = Infinity;
+    }
+    distances[startIdx] = 0;
+    
+    for (var iteration = 0; iteration < platforms.length; iteration++) {
+      var minDist = Infinity;
+      var current = -1;
+      
+      for (var i = 0; i < platforms.length; i++) {
+        if (!visited[i] && distances[i] < minDist) {
+          minDist = distances[i];
+          current = i;
+        }
+      }
+      
+      if (current === -1 || current === targetIdx) break;
+      visited[current] = true;
+      
+      // Check reachable neighbors
+      var curPl = platforms[current];
+      for (var j = 0; j < platforms.length; j++) {
+        if (visited[j]) continue;
+        var nxtPl = platforms[j];
+        
+        // Can reach if single jump or double jump is available
+        if (canJump(curPl, nxtPl) || canJump(nxtPl, curPl)) {
+          var gap = platformGap(curPl, nxtPl);
+          var climb = Math.max(0, nxtPl.y - curPl.y);
+          var cost = 1 + (gap / 100) + (climb / 150); // Favor easier jumps
+          
+          if (distances[current] + cost < distances[j]) {
+            distances[j] = distances[current] + cost;
+            previous[j] = current;
+          }
+        }
+      }
+    }
+    
+    // Reconstruct path
+    if (distances[targetIdx] === Infinity) return null;
+    var path = [targetIdx];
+    var cur = targetIdx;
+    while (previous[cur] !== undefined) {
+      cur = previous[cur];
+      path.unshift(cur);
+    }
+    
+    return path;
+  };
+
   // draw path debug for all hunters (ctx is main canvas context)
   window.renderHunterDebug = function(ctx, g, cam) {
     if (!ctx || !g || !g.en) return;
