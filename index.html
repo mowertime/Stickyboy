@@ -2285,19 +2285,23 @@
           updateBestDiff()
         }
         g.plat = g.plat.filter(function(p) {
-          return p.x + p.w > g.cam - 400
+          return p.x + p.w > g.cam - 200
         });
         g.coinItems = g.coinItems.filter(function(c) {
-          return c.x > g.cam - 400
+          return c.x > g.cam - 200
         });
         g.obs = g.obs.filter(function(o) {
-          return o.x > g.cam - 400
+          return o.x > g.cam - 200
         });
         g.en = g.en.filter(function(e) {
-          return e.x > g.cam - 400
+          return e.x > g.cam - 200
         });
+        // Ensure we have at least one platform, regenerate if all were removed
+        if (g.plat.length === 0) {
+          g.plat.push({x: g.cam + 100, y: 350, w: 200, h: 15});
+        }
         var lp = g.plat[g.plat.length - 1];
-        if (lp.x + lp.w < g.cam + W + 400) {
+        if (lp && lp.x + lp.w < g.cam + W + 400) {
           var np = genPlat(lp.x + lp.w, lp);
           g.plat.push(np);
           g.pgen++;
