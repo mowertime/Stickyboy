@@ -1750,15 +1750,16 @@
 
       function loop(t) {
         if (g.over || !g.start) return;
-        anim = requestAnimationFrame(loop);
-        // enhanced background with gradient
-        var bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-        bgGrad.addColorStop(0, '#0f172a');
-        bgGrad.addColorStop(1, '#1e293b');
-        ctx.fillStyle = bgGrad;
-        ctx.fillRect(0, 0, W, H);
-        var p = g.p;
-        var cls = classes[selClass];
+        try {
+          anim = requestAnimationFrame(loop);
+          // enhanced background with gradient
+          var bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+          bgGrad.addColorStop(0, '#0f172a');
+          bgGrad.addColorStop(1, '#1e293b');
+          ctx.fillStyle = bgGrad;
+          ctx.fillRect(0, 0, W, H);
+          var p = g.p;
+          var cls = classes[selClass];
         var speedMul = 1 + ((g.upgrades && g.upgrades.speed) ? (0.08 * g.upgrades.speed) : 0);
         // apply speed boost if active
         if (p._speedBoost && p._speedBoost > 0) {
@@ -2431,7 +2432,12 @@
         }
         // debug render for hunters (optional)
         if (g.showHunterDebug && typeof renderHunterDebug === 'function') renderHunterDebug(ctx, g, g.cam);
-        drawStick(p, g.cam)
+        drawStick(p, g.cam);
+        } catch (err) {
+          console.error('Game loop error:', err);
+          // Continue loop even on error
+          anim = requestAnimationFrame(loop);
+        }
       }
 
       function startGame() {
