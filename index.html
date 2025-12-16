@@ -2301,16 +2301,16 @@
           updateBestDiff()
         }
         g.plat = g.plat.filter(function(p) {
-          return p.x + p.w > g.cam - 100
+          return p.x + p.w > g.cam - 400
         });
         g.coinItems = g.coinItems.filter(function(c) {
-          return c.x > g.cam - 100
+          return c.x > g.cam - 400
         });
         g.obs = g.obs.filter(function(o) {
-          return o.x > g.cam - 100
+          return o.x > g.cam - 400
         });
         g.en = g.en.filter(function(e) {
-          return e.x > g.cam - 100
+          return e.x > g.cam - 400
         });
         var lp = g.plat[g.plat.length - 1];
         if (lp.x + lp.w < g.cam + W + 400) {
