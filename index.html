@@ -633,8 +633,38 @@
       <button class="control-btn" onmousedown="key('right',1)" onmouseup="key('right',0)" ontouchstart="key('right',1)" ontouchend="key('right',0)">→</button>
     </div>
     <p style="color:#64748b;font-size:14px;margin-top:16px">← → or A/D to move • ↑ or W or SPACE to jump • SHIFT to attack</p>
+    <div id="errorLog" style="display:none;position:fixed;bottom:10px;right:10px;background:rgba(239,68,68,0.95);color:#fff;padding:12px 16px;border-radius:8px;max-width:400px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:11px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>🐛 Error Log</strong>
+        <button onclick="document.getElementById('errorLog').style.display='none'" style="background:#dc2626;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10px">✕</button>
+      </div>
+      <div id="errorLogContent"></div>
+    </div>
+    <button onclick="toggleErrorLog()" style="position:fixed;bottom:10px;right:10px;background:rgba(100,116,139,0.8);color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:11px;z-index:1000;font-family:Arial">📋 Logs</button>
     <script src="ai_hunter.js"></script>
     <script>
+      // Error logging system
+      var errorLog = [];
+      function logError(msg, err) {
+        var timestamp = new Date().toLocaleTimeString();
+        var entry = timestamp + ' - ' + msg + (err ? ': ' + err.message : '');
+        errorLog.push(entry);
+        console.error(entry, err);
+        updateErrorLogDisplay();
+        document.getElementById('errorLog').style.display = 'block';
+      }
+      function updateErrorLogDisplay() {
+        var content = document.getElementById('errorLogContent');
+        if (content) {
+          content.innerHTML = errorLog.slice(-10).map(function(e) {
+            return '<div style="margin:4px 0;padding:4px;background:rgba(0,0,0,0.3);border-radius:4px">' + e + '</div>';
+          }).join('');
+        }
+      }
+      function toggleErrorLog() {
+        var log = document.getElementById('errorLog');
+        log.style.display = log.style.display === 'none' ? 'block' : 'none';
+      }
       // core setup
       var c = document.getElementById('gameCanvas'),
         ctx = c.getContext('2d'),
@@ -2434,7 +2464,7 @@
         if (g.showHunterDebug && typeof renderHunterDebug === 'function') renderHunterDebug(ctx, g, g.cam);
         drawStick(p, g.cam);
         } catch (err) {
-          console.error('Game loop error:', err);
+          logError('Game loop error', err);
           // Continue loop even on error
           anim = requestAnimationFrame(loop);
         }
