@@ -1129,6 +1129,7 @@
           mv = Math.abs(p.vx) > .5;
         if (p.inv > 0 && Math.floor(p.inv / 5) % 2 == 0) return;
         ctx.save();
+        ctx.globalAlpha = 1.0;
         var cls = classes[selClass];
         ctx.strokeStyle = p.inv > 0 ? '#fca5a5' : cls.color;
         ctx.shadowColor = cls.color;
