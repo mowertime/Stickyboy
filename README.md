@@ -19,19 +19,30 @@ A fast-paced browser-based platformer game where you control a stickman running 
 - **Power-ups**: Collect health boosts, speed boosts, and shields during your run
 - **Coins & Score**: Collect coins to buy upgrades and beat your high score
 - **Smooth Controls**: Responsive keyboard controls for movement and attacks
+- **Fullscreen Mode**: Cross-platform fullscreen support (press F or click button)
+- **Smart Touch Controls**: Automatically hides on-screen controls when keyboard is detected
+- **Mobile-Friendly**: Works great on phones, tablets, and desktops
 - **Debug Mode**: Enable pathfinding visualization to see AI in action
 
 ## How to Play
 
+### Keyboard Controls
 - **Arrow Keys** or **A/D**: Move left/right
 - **Space** or **W/Up Arrow**: Jump
 - **Shift** or **E/K**: Attack/Shoot
+- **F**: Toggle fullscreen
 - **ESC**: Pause game
+
+### Touch Controls (Mobile/Tablet)
+- On-screen buttons appear automatically on touch devices
+- Automatically hide when physical keyboard is detected
+- Works great with Bluetooth/external keyboards
 
 ### Tips
 - Avoid obstacles and spike platforms
 - Defeat enemies to collect coins and power-ups
 - Use the Archer's charge attack for maximum damage
+- Press F or click ⛶ button for fullscreen mode
 - Enable debug mode in settings to see hunter AI pathfinding
 
 Collect coins, defeat enemies, and survive as long as possible!

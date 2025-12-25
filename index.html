@@ -493,6 +493,7 @@
       <div id="bestDiffBar">Distance to best: 0</div>
       <div id="hudTopRight">
         <button class="settingsBtn" onclick="goToUpgrades()">🛠 UPGRADES</button>
+        <button class="settingsBtn" onclick="toggleFullscreen()" id="fullscreenBtn">⛶</button>
       </div>
       <canvas id="gameCanvas" width="800" height="500"></canvas>
       <canvas id="previewCanvas" width="800" height="500" style="display:none"></canvas>
@@ -2514,6 +2515,121 @@
       function key(k, v) {
         g.k[k] = v
       }
+      
+      // Fullscreen functionality with cross-platform support
+      function toggleFullscreen() {
+        var elem = document.documentElement;
+        var btn = document.getElementById('fullscreenBtn');
+        
+        if (!document.fullscreenElement && 
+            !document.webkitFullscreenElement && 
+            !document.mozFullScreenElement && 
+            !document.msFullscreenElement) {
+          // Enter fullscreen
+          if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+          } else if (elem.webkitRequestFullscreen) { // Safari
+            elem.webkitRequestFullscreen();
+          } else if (elem.mozRequestFullScreen) { // Firefox
+            elem.mozRequestFullScreen();
+          } else if (elem.msRequestFullscreen) { // IE/Edge
+            elem.msRequestFullscreen();
+          }
+          
+          // Lock orientation to landscape on mobile if supported
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(function() {});
+          }
+        } else {
+          // Exit fullscreen
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+          
+          // Unlock orientation
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          }
+        }
+      }
+      
+      // Update button icon when fullscreen state changes
+      function updateFullscreenButton() {
+        var btn = document.getElementById('fullscreenBtn');
+        if (btn) {
+          if (document.fullscreenElement || 
+              document.webkitFullscreenElement || 
+              document.mozFullScreenElement || 
+              document.msFullscreenElement) {
+            btn.textContent = '⛶'; // Exit fullscreen icon
+          } else {
+            btn.textContent = '⛶'; // Enter fullscreen icon
+          }
+        }
+      }
+      
+      // Keyboard detection for mobile controls
+      var hasPhysicalKeyboard = false;
+      var keyboardCheckTimeout = null;
+      
+      function checkForPhysicalKeyboard() {
+        // Check if device has a physical keyboard by detecting keyboard events
+        var controls = document.querySelector('.controls');
+        
+        // On mobile/tablet without keyboard, controls show via CSS media query
+        // If we detect keyboard input, hide them
+        if (hasPhysicalKeyboard && controls) {
+          controls.style.display = 'none';
+        } else if (controls && window.innerWidth <= 768) {
+          // Only show if mobile size and no keyboard detected
+          if (!hasPhysicalKeyboard) {
+            controls.style.display = 'flex';
+          }
+        }
+      }
+      
+      // Detect physical keyboard by monitoring for actual key presses
+      function onKeyboardDetected() {
+        if (!hasPhysicalKeyboard) {
+          hasPhysicalKeyboard = true;
+          checkForPhysicalKeyboard();
+        }
+        
+        // Reset the flag after 30 seconds of no keyboard activity
+        clearTimeout(keyboardCheckTimeout);
+        keyboardCheckTimeout = setTimeout(function() {
+          hasPhysicalKeyboard = false;
+          checkForPhysicalKeyboard();
+        }, 30000);
+      }
+      
+      // Listen for keyboard events to detect physical keyboard
+      window.addEventListener('keydown', function(e) {
+        // Only consider actual game control keys to avoid false positives
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 
+             'a', 'A', 'd', 'D', 'w', 'W', ' ', 'Shift', 'k', 'K'].includes(e.key)) {
+          onKeyboardDetected();
+        }
+      });
+      
+      // Check on window resize
+      window.addEventListener('resize', checkForPhysicalKeyboard);
+      
+      // Initial check
+      setTimeout(checkForPhysicalKeyboard, 100);
+      
+      // Listen for fullscreen changes
+      document.addEventListener('fullscreenchange', updateFullscreenButton);
+      document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+      document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+      document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+      
       window.addEventListener('keydown', function(e) {
         if (e.key == 'ArrowLeft' || e.key == 'a' || e.key == 'A') g.k.left = 1;
         if (e.key == 'ArrowRight' || e.key == 'd' || e.key == 'D') g.k.right = 1;
@@ -2530,6 +2646,11 @@
         }
         if ('123'.includes(e.key)) {
           selectClass(parseInt(e.key) - 1)
+        }
+        // F key or F11 for fullscreen toggle
+        if (e.key == 'f' || e.key == 'F') {
+          e.preventDefault();
+          toggleFullscreen();
         }
       });
       window.addEventListener('keyup', function(e) {
