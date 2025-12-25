@@ -1,5 +1,194 @@
 // Hunter AI helpers and debug renderer (separated for clarity)
 (function(){
+  // Grid-based pathfinding system
+  var GRID_SIZE = 40; // Grid cell size in pixels
+  var grid = null;
+  var gridWidth = 0;
+  var gridHeight = 0;
+  var gridOffsetX = 0;
+  
+  // Initialize or update the navigation grid based on current platforms
+  window.updateNavigationGrid = function(platforms, camX, worldW, worldH) {
+    if (!platforms || platforms.length === 0) return;
+    
+    // Create grid bounds around visible area + buffer
+    var minX = camX - 200;
+    var maxX = camX + worldW + 400;
+    gridOffsetX = minX;
+    gridWidth = Math.ceil((maxX - minX) / GRID_SIZE);
+    gridHeight = Math.ceil(worldH / GRID_SIZE);
+    
+    // Initialize grid (0 = blocked, 1 = walkable, 2 = air/jumpable)
+    grid = [];
+    for (var y = 0; y < gridHeight; y++) {
+      grid[y] = [];
+      for (var x = 0; x < gridWidth; x++) {
+        grid[y][x] = 2; // Air by default
+      }
+    }
+    
+    // Mark platforms as walkable
+    for (var i = 0; i < platforms.length; i++) {
+      var pl = platforms[i];
+      var gx1 = Math.floor((pl.x - gridOffsetX) / GRID_SIZE);
+      var gx2 = Math.ceil((pl.x + pl.w - gridOffsetX) / GRID_SIZE);
+      var gy = Math.floor(pl.y / GRID_SIZE);
+      
+      // Mark platform surface
+      for (var x = Math.max(0, gx1); x < Math.min(gridWidth, gx2); x++) {
+        if (gy >= 0 && gy < gridHeight) {
+          grid[gy][x] = pl.spikes ? 0 : 1; // 1 = walkable, 0 = spike/blocked
+          // Mark air above platform as jumpable
+          if (gy > 0) grid[gy - 1][x] = 2;
+        }
+      }
+    }
+  };
+  
+  // Convert world position to grid coordinates
+  window.worldToGrid = function(x, y) {
+    return {
+      gx: Math.floor((x - gridOffsetX) / GRID_SIZE),
+      gy: Math.floor(y / GRID_SIZE)
+    };
+  };
+  
+  // Convert grid to world position (center of cell)
+  window.gridToWorld = function(gx, gy) {
+    return {
+      x: gridOffsetX + gx * GRID_SIZE + GRID_SIZE / 2,
+      y: gy * GRID_SIZE + GRID_SIZE / 2
+    };
+  };
+  
+  // Check if grid cell is valid and walkable
+  window.isGridWalkable = function(gx, gy) {
+    if (!grid || gx < 0 || gy < 0 || gx >= gridWidth || gy >= gridHeight) return false;
+    return grid[gy][gx] === 1; // Only walkable cells
+  };
+  
+  // Check if can jump from one grid cell to another
+  window.canGridJump = function(fromGx, fromGy, toGx, toGy) {
+    if (!grid) return false;
+    var dx = Math.abs(toGx - fromGx);
+    var dy = toGy - fromGy;
+    
+    // Max horizontal jump ~6 cells, max vertical jump ~4 cells up, ~6 down
+    if (dx > 6) return false;
+    if (dy > 6) return false; // Can fall further
+    if (dy < -4) return false; // Can't jump too high
+    
+    // Target must be walkable
+    return isGridWalkable(toGx, toGy);
+  };
+  
+  // Grid-based A* pathfinding
+  window.findGridPath = function(startX, startY, targetX, targetY) {
+    if (!grid) return null;
+    
+    var start = worldToGrid(startX, startY);
+    var target = worldToGrid(targetX, targetY);
+    
+    if (!isGridWalkable(start.gx, start.gy) || !isGridWalkable(target.gx, target.gy)) {
+      return null;
+    }
+    
+    function heuristic(gx, gy) {
+      var dx = Math.abs(gx - target.gx);
+      var dy = Math.abs(gy - target.gy);
+      return dx + dy; // Manhattan distance
+    }
+    
+    function key(gx, gy) { return gx + '_' + gy; }
+    
+    var openSet = [start];
+    var cameFrom = {};
+    var gScore = {};
+    var fScore = {};
+    
+    gScore[key(start.gx, start.gy)] = 0;
+    fScore[key(start.gx, start.gy)] = heuristic(start.gx, start.gy);
+    
+    while (openSet.length > 0) {
+      // Find node with lowest fScore
+      var currentIdx = 0;
+      for (var i = 1; i < openSet.length; i++) {
+        var currKey = key(openSet[i].gx, openSet[i].gy);
+        var bestKey = key(openSet[currentIdx].gx, openSet[currentIdx].gy);
+        if ((fScore[currKey] || Infinity) < (fScore[bestKey] || Infinity)) {
+          currentIdx = i;
+        }
+      }
+      
+      var current = openSet.splice(currentIdx, 1)[0];
+      
+      if (current.gx === target.gx && current.gy === target.gy) {
+        // Reconstruct path
+        var path = [current];
+        var curr = current;
+        var currKey = key(curr.gx, curr.gy);
+        while (cameFrom[currKey]) {
+          curr = cameFrom[currKey];
+          path.unshift(curr);
+          currKey = key(curr.gx, curr.gy);
+        }
+        return path;
+      }
+      
+      // Check neighbors (8-directional + jump arcs)
+      var neighbors = [];
+      
+      // Walking neighbors
+      for (var dx = -1; dx <= 1; dx++) {
+        var ngx = current.gx + dx;
+        var ngy = current.gy;
+        if (isGridWalkable(ngx, ngy)) {
+          neighbors.push({ gx: ngx, gy: ngy, cost: 1 });
+        }
+      }
+      
+      // Jump neighbors
+      for (var dx = -6; dx <= 6; dx++) {
+        for (var dy = -4; dy <= 6; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          var ngx = current.gx + dx;
+          var ngy = current.gy + dy;
+          if (canGridJump(current.gx, current.gy, ngx, ngy)) {
+            var jumpCost = 2 + Math.abs(dx) * 0.3 + Math.max(0, -dy) * 0.5; // Favor easier jumps
+            neighbors.push({ gx: ngx, gy: ngy, cost: jumpCost });
+          }
+        }
+      }
+      
+      for (var i = 0; i < neighbors.length; i++) {
+        var neighbor = neighbors[i];
+        var neighborKey = key(neighbor.gx, neighbor.gy);
+        var currentKey = key(current.gx, current.gy);
+        var tentativeG = (gScore[currentKey] || Infinity) + neighbor.cost;
+        
+        if (tentativeG < (gScore[neighborKey] || Infinity)) {
+          cameFrom[neighborKey] = current;
+          gScore[neighborKey] = tentativeG;
+          fScore[neighborKey] = tentativeG + heuristic(neighbor.gx, neighbor.gy);
+          
+          // Add to open set if not already there
+          var inOpen = false;
+          for (var j = 0; j < openSet.length; j++) {
+            if (openSet[j].gx === neighbor.gx && openSet[j].gy === neighbor.gy) {
+              inOpen = true;
+              break;
+            }
+          }
+          if (!inOpen) {
+            openSet.push({ gx: neighbor.gx, gy: neighbor.gy });
+          }
+        }
+      }
+    }
+    
+    return null; // No path found
+  };
+  
   // find platform by center x when possible
   window.findPlatformIndexAtX = function(x, w) {
     var cx = x + (w || 0) / 2;
@@ -8,6 +197,95 @@
       if (cx >= pl.x && cx <= pl.x + pl.w) return i;
     }
     return -1;
+  };
+
+  // Behavior Tree Node Types
+  window.BehaviorTree = {
+    // Selector: returns success if any child succeeds
+    Selector: function(children) {
+      return function(entity) {
+        for (var i = 0; i < children.length; i++) {
+          var result = children[i](entity);
+          if (result === 'success') return 'success';
+        }
+        return 'failure';
+      };
+    },
+    
+    // Sequence: returns success only if all children succeed
+    Sequence: function(children) {
+      return function(entity) {
+        for (var i = 0; i < children.length; i++) {
+          var result = children[i](entity);
+          if (result !== 'success') return result;
+        }
+        return 'success';
+      };
+    },
+    
+    // Condition node
+    Condition: function(check) {
+      return function(entity) {
+        return check(entity) ? 'success' : 'failure';
+      };
+    },
+    
+    // Action node
+    Action: function(action) {
+      return function(entity) {
+        return action(entity);
+      };
+    }
+  };
+  
+  // Hunter Behavior Tree
+  window.createHunterBehaviorTree = function() {
+    var BT = window.BehaviorTree;
+    
+    return BT.Selector([
+      // Priority 1: Attack if close
+      BT.Sequence([
+        BT.Condition(function(e) {
+          if (!e._cachedPlayer) return false;
+          var dx = Math.abs(e.x - e._cachedPlayer.x);
+          var dy = Math.abs(e.y - e._cachedPlayer.y);
+          return dx < 50 && dy < 30;
+        }),
+        BT.Action(function(e) {
+          e._btState = 'ATTACKING';
+          return 'success';
+        })
+      ]),
+      
+      // Priority 2: Follow path if exists
+      BT.Sequence([
+        BT.Condition(function(e) {
+          return e._gridPath && e._gridPath.length > 1;
+        }),
+        BT.Action(function(e) {
+          e._btState = 'FOLLOWING_PATH';
+          return 'success';
+        })
+      ]),
+      
+      // Priority 3: Calculate new path
+      BT.Sequence([
+        BT.Condition(function(e) {
+          return e._cachedPlayer && (!e._pathRecalcTimer || e._pathRecalcTimer <= 0);
+        }),
+        BT.Action(function(e) {
+          e._btState = 'CALCULATING_PATH';
+          e._pathRecalcTimer = 30; // Recalc every 30 frames
+          return 'success';
+        })
+      ]),
+      
+      // Priority 4: Idle/patrol
+      BT.Action(function(e) {
+        e._btState = 'IDLE';
+        return 'success';
+      })
+    ]);
   };
 
   window.platformGap = function(a, b) {
@@ -168,42 +446,68 @@
     ctx.save();
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.9;
+    
     for (var i = 0; i < g.en.length; i++) {
       var e = g.en[i];
       if (e.dead || e.type !== 'hunter') continue;
-      if (!e._path || e._path.length === 0) continue;
-      // draw path lines between platform centers
-      ctx.strokeStyle = 'rgba(124,58,237,0.9)'; ctx.fillStyle = 'rgba(124,58,237,0.12)';
-      ctx.beginPath();
-      for (var j = 0; j < e._path.length; j++) {
-        var pi = e._path[j];
-        if (pi < 0 || pi >= g.plat.length) continue;
-        var pl = g.plat[pi];
-        if (!pl) continue;
-        var cx = pl.x + pl.w / 2 - cam, cy = pl.y - 8;
-        if (j === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
-      }
-      ctx.stroke();
-      // draw nodes
-      for (var j = 0; j < e._path.length; j++) {
-        var pi = e._path[j]; 
-        if (pi < 0 || pi >= g.plat.length) continue;
-        var pl = g.plat[pi]; 
-        if (!pl) continue;
-        var cx = pl.x + pl.w / 2 - cam, cy = pl.y - 8;
-        ctx.beginPath(); ctx.arc(cx, cy, j === 1 ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      }
-      // draw line from hunter to next target if any
-      if (e._path && e._path.length > 1) {
-        var nextIdx = e._path[1];
-        if (nextIdx >= 0 && nextIdx < g.plat.length) {
-          var nextPl = g.plat[nextIdx]; 
-          if (nextPl) {
-            var hx = e.x + e.w / 2 - cam, hy = e.y + e.h / 2;
-            var tx = nextPl.x + nextPl.w / 2 - cam, ty = nextPl.y - 8;
-            ctx.strokeStyle = 'rgba(250,204,21,0.9)'; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty); ctx.stroke();
+      
+      // Draw grid path if it exists
+      if (e._gridPath && e._gridPath.length > 0) {
+        ctx.strokeStyle = 'rgba(34,197,94,0.8)';
+        ctx.fillStyle = 'rgba(34,197,94,0.5)';
+        ctx.beginPath();
+        
+        for (var j = 0; j < e._gridPath.length; j++) {
+          var cell = e._gridPath[j];
+          var worldPos = gridToWorld(cell.gx, cell.gy);
+          var wx = worldPos.x - cam;
+          var wy = worldPos.y;
+          
+          if (j === 0) {
+            ctx.moveTo(wx, wy);
+          } else {
+            ctx.lineTo(wx, wy);
           }
         }
+        ctx.stroke();
+        
+        // Draw path nodes
+        for (var j = 0; j < e._gridPath.length; j++) {
+          var cell = e._gridPath[j];
+          var worldPos = gridToWorld(cell.gx, cell.gy);
+          var wx = worldPos.x - cam;
+          var wy = worldPos.y;
+          
+          ctx.beginPath();
+          ctx.arc(wx, wy, j === 0 ? 5 : 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      
+      // Draw line from hunter to current target
+      if (e._currentTarget) {
+        var hx = e.x + e.w / 2 - cam;
+        var hy = e.y + e.h / 2;
+        var tx = e._currentTarget.x - cam;
+        var ty = e._currentTarget.y;
+        
+        ctx.strokeStyle = 'rgba(250,204,21,0.9)';
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      
+      // Draw state text
+      if (e._btState) {
+        var textX = e.x + e.w / 2 - cam;
+        var textY = e.y - 10;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(e._btState, textX, textY);
       }
     }
     ctx.restore();

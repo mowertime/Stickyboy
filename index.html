@@ -1783,6 +1783,17 @@
         if (g.over || !g.start) return;
         try {
           anim = requestAnimationFrame(loop);
+          
+          // Update navigation grid periodically (every 10 frames)
+          if (typeof updateNavigationGrid === 'function') {
+            if (!g._gridUpdateCounter) g._gridUpdateCounter = 0;
+            g._gridUpdateCounter++;
+            if (g._gridUpdateCounter >= 10) {
+              updateNavigationGrid(g.plat, g.cam, W, H);
+              g._gridUpdateCounter = 0;
+            }
+          }
+          
           // enhanced background with gradient
           var bgGrad = ctx.createLinearGradient(0, 0, 0, H);
           bgGrad.addColorStop(0, '#0f172a');
@@ -1930,132 +1941,135 @@
         for (var i = 0; i < g.en.length; i++) {
           var e = g.en[i];
           if (e.dead) continue;
-          // hunter behavior: FSM-based AI with intelligent pathfinding and jump optimization
+          // hunter behavior: Grid-based pathfinding + Behavior Tree AI
           if (e.type === 'hunter') {
             var speed = (e.speed || 2.2);
             
-            // Initialize FSM state if not set
-            if (!e._state) {
-              e._state = 'IDLE';
-              e._stateTimer = 0;
-              e._targetPlatIdx = null;
-              e._jumpPrediction = null;
-            }
-            
-            // Find current platform
-            var curPlIdx = -1;
-            for (var j = 0; j < g.plat.length; j++) {
-              if (e.x + e.w > g.plat[j].x && e.x < g.plat[j].x + g.plat[j].w && 
-                  Math.abs((e.y + e.h) - g.plat[j].y) < 8) {
-                curPlIdx = j;
-                break;
+            // Initialize behavior tree if not set
+            if (!e._behaviorTree) {
+              if (typeof createHunterBehaviorTree === 'function') {
+                e._behaviorTree = createHunterBehaviorTree();
+              } else {
+                e._behaviorTree = function() { return 'success'; }; // Fallback
               }
+              e._btState = 'ATTACKING'; // Start in attacking mode
+              e._pathRecalcTimer = 0;
+              e._gridPath = null;
+              e._currentTarget = null;
+              e._cachedPlayer = p;
             }
             
-            var playerPlIdx = -1;
-            for (var j = 0; j < g.plat.length; j++) {
-              if (p.x + p.w > g.plat[j].x && p.x < g.plat[j].x + g.plat[j].w) {
-                playerPlIdx = j;
-                break;
-              }
+            // Update cached player reference
+            e._cachedPlayer = p;
+            
+            // Decrement timers
+            if (e._pathRecalcTimer > 0) e._pathRecalcTimer--;
+            
+            // Run behavior tree to determine state
+            if (e._behaviorTree) e._behaviorTree(e);
+            
+            // If no state set or stuck in idle, force attacking
+            if (!e._btState || e._btState === 'IDLE') {
+              e._btState = 'ATTACKING';
             }
             
-            // FSM State Machine
-            if (e._state === 'IDLE' || e._state === 'CALCULATING') {
-              // Calculate best path to player using platform graph
-              if (curPlIdx !== -1 && playerPlIdx !== -1 && curPlIdx !== playerPlIdx) {
-                // Find safest path considering jump distances
-                var path = findOptimalHunterPath(curPlIdx, playerPlIdx, g.plat, e.jl);
+            // Execute behavior based on state
+            if (e._btState === 'CALCULATING_PATH') {
+              // Calculate grid-based path to player
+              if (typeof findGridPath === 'function') {
+                var path = findGridPath(e.x + e.w / 2, e.y + e.h / 2, p.x + p.w / 2, p.y + p.h / 2);
                 if (path && path.length > 1) {
-                  e._targetPlatIdx = path[1];
-                  e._state = 'PURSUING';
-                  e._stateTimer = 0;
+                  e._gridPath = path;
+                  e._pathIndex = 0;
+                  e._btState = 'FOLLOWING_PATH';
                 } else {
-                  e._state = 'IDLE';
+                  e._btState = 'IDLE';
                 }
-              } else if (playerPlIdx !== -1 && curPlIdx === playerPlIdx) {
-                // On same platform as player
-                e._state = 'ATTACKING';
               } else {
-                e._state = 'IDLE';
+                // Fallback to simple chase
+                e._btState = 'ATTACKING';
               }
             }
             
-            if (e._state === 'PURSUING' && e._targetPlatIdx !== null && e.gnd) {
-              var targetPl = g.plat[e._targetPlatIdx];
-              var targetCx = targetPl.x + targetPl.w / 2;
-              var hunterCx = e.x + e.w / 2;
-              var distToTarget = Math.abs(targetCx - hunterCx);
+            if (e._btState === 'FOLLOWING_PATH' && e._gridPath && e._gridPath.length > 1) {
+              // Follow grid path
+              var nextCell = e._gridPath[1]; // Next waypoint
+              if (typeof gridToWorld === 'function') {
+                var targetPos = gridToWorld(nextCell.gx, nextCell.gy);
+                e._currentTarget = targetPos;
               
-              // Move toward target platform
-              if (distToTarget > 20) {
-                e.vx = Math.sign(targetCx - hunterCx) * speed;
-              } else {
-                // At edge, attempt intelligent jump
-                if (e.jl > 0) {
-                  var jumpValid = canJump(g.plat[curPlIdx], targetPl);
-                  if (jumpValid) {
+                var dx = targetPos.x - (e.x + e.w / 2);
+                var dy = targetPos.y - (e.y + e.h / 2);
+                var dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Move towards target
+                if (Math.abs(dx) > 10) {
+                  e.vx = Math.sign(dx) * speed;
+                } else {
+                  e.vx = 0;
+                }
+                
+                // Jump if needed (target is above or far away)
+                if (e.gnd && e.jl > 0) {
+                  var needsJump = dy < -20 || (Math.abs(dx) > 60 && Math.abs(dy) < 80);
+                  if (needsJump) {
                     e.vy = -13;
                     e.gnd = 0;
                     e.jl--;
-                    e._state = 'JUMPING';
-                    e._stateTimer = 0;
                   }
                 }
-              }
-            }
-            
-            if (e._state === 'JUMPING') {
-              e._stateTimer++;
-              var targetCx = e._targetPlatIdx !== null ? g.plat[e._targetPlatIdx].x + g.plat[e._targetPlatIdx].w / 2 : p.x + p.w / 2;
-              var hunterCx = e.x + e.w / 2;
-              var distX = targetCx - hunterCx;
-              
-              // Mid-air steering
-              e.vx = Math.sign(distX) * speed * 1.2;
-              
-              // Smart double jump: use it if falling and far from target
-              if (e.jl > 0 && e.vy > 1) {
-                var targetPl = e._targetPlatIdx !== null ? g.plat[e._targetPlatIdx] : null;
-                if (targetPl && Math.abs(distX) > 60 && Math.abs(e.y - targetPl.y) > 40) {
-                  e.vy = -11;
-                  e.jl--;
+                
+                // Reached waypoint, advance to next
+                if (dist < 30) {
+                  e._gridPath.shift();
+                  if (e._gridPath.length <= 1) {
+                    e._gridPath = null;
+                    e._btState = 'ATTACKING';
+                  }
                 }
+              } else {
+                // Fallback if gridToWorld not available
+                e._btState = 'ATTACKING';
               }
             }
             
-            if (e._state === 'ATTACKING') {
-              // Chase player on same platform
-              var px = p.x + p.w / 2;
-              var ex = e.x + e.w / 2;
-              var distX = Math.abs(px - ex);
+            if (e._btState === 'ATTACKING') {
+              // Direct pursuit of player
+              var dx = p.x - e.x;
+              var dy = p.y - e.y;
+              var dist = Math.sqrt(dx * dx + dy * dy);
               
-              if (distX > 30) {
-                e.vx = Math.sign(px - ex) * speed * 1.2;
+              if (Math.abs(dx) > 20) {
+                e.vx = Math.sign(dx) * speed * 1.3;
               } else {
                 e.vx = 0;
               }
               
-              // Recalculate if player jumps to different platform
-              if (playerPlIdx !== curPlIdx && playerPlIdx !== -1) {
-                e._state = 'CALCULATING';
+              // Jump towards player if needed
+              if (e.gnd && e.jl > 0 && (dy < -40 || (Math.abs(dx) > 70 && dist > 100))) {
+                e.vy = -13;
+                e.gnd = 0;
+                e.jl--;
+              }
+              
+              // Recalculate path if player is far
+              if (dist > 200) {
+                e._btState = 'CALCULATING_PATH';
+                e._pathRecalcTimer = 0;
               }
             }
             
-            // Fallback: simple pursuit if state breaks
-            if (e._state === 'IDLE' || !e._state) {
+            if (e._btState === 'IDLE') {
+              // Simple chase as fallback
               var dx = p.x - e.x;
-              e.vx = Math.sign(dx) * speed * 0.8;
+              if (Math.abs(dx) > 20) {
+                e.vx = Math.sign(dx) * speed * 0.8;
+              } else {
+                e.vx *= 0.8;
+              }
             }
             
-            // Air control
-            if (!e.gnd && e.vy > 2) {
-              e.vx = Math.sign(e._targetPlatIdx !== null ? 
-                (g.plat[e._targetPlatIdx].x + g.plat[e._targetPlatIdx].w / 2) - (e.x + e.w / 2) : 
-                p.x - e.x) * speed;
-            }
-
-            // apply physics
+            // Apply physics
             e.vy = (e.vy || 0) + 0.6;
             e.y += e.vy;
             e.x += e.vx;
@@ -2069,9 +2083,7 @@
                 if (pl.spikes) {
                   e.dead = 1;
                 } else {
-                  e.y = pl.y - e.h; e.vy = 0; e.gnd = 1; e.jl = 2; e._jumpingTo = null; e._doubleJumpUsed = false;
-                  // give a short think cooldown after landing so hunter commits to next step
-                  e._thinkCooldown = 6;
+                  e.y = pl.y - e.h; e.vy = 0; e.gnd = 1; e.jl = 2;
                 }
               }
             }
