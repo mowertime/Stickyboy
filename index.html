@@ -30,7 +30,7 @@
         border: 2px solid rgba(34, 211, 238, 0.3);
         border-radius: 16px;
         display: block;
-        box-shadow: 0 0 50px rgba(34, 211, 238, 0.2)
+        box-shadow: 0 0 50px rgba(34, 211, 238, 0.2) 
       }
 
       .hud {
@@ -868,8 +868,9 @@
         if (i < 5 || p.w < 150 || Math.random() > .5) return null;
         var rand = Math.random();
         var type = 'normal';
-        if (rand > 0.70) type = 'hunter';
-        else if (rand > 0.55) type = 'archer'; // 15% chance for archer
+        if (rand > 0.75) type = 'hunter';
+        else if (rand > 0.65) type = 'spider'; // 10% chance for spider
+        else if (rand > 0.55) type = 'archer'; // 10% chance for archer
         var en = {
           x: p.x + p.w / 2,
           y: p.y - 40,
@@ -902,6 +903,12 @@
           en.hp = 2;
           en.speed = 1.5;
           en._shootCooldown = 0;
+        } else if (type === 'spider') {
+          en.hp = 2;
+          en.speed = 1.2;
+          en._shootCooldown = 90; // initial cooldown
+          en.y = p.y - p.h - 60; // spawn above platform (on ceiling)
+          en.onCeiling = true;
         }
         return en
       }
@@ -1083,7 +1090,10 @@
           canShoot: 1,
           charging: false,
           charge: 0,
-          chargeMax: 40
+          chargeMax: 40,
+          frozen: 0,
+          frozenVx: 0,
+          frozenVy: 0
         };
         g.plat = [{
           x: 50,
@@ -1320,6 +1330,35 @@
         ctx.moveTo(cx, y + 25);
         ctx.lineTo(cx + (mv ? asw : -8) * (p.right ? -1 : 1), y + 32);
         ctx.stroke();
+        
+        // draw web overlay if player is frozen
+        if (p.frozen > 0) {
+          ctx.strokeStyle = 'rgba(209, 213, 219, 0.7)';
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          // web strands crossing the player
+          ctx.beginPath();
+          ctx.moveTo(x - 5, y);
+          ctx.lineTo(x + p.w + 5, y + p.h);
+          ctx.moveTo(x + p.w + 5, y);
+          ctx.lineTo(x - 5, y + p.h);
+          ctx.moveTo(x + p.w / 2, y - 5);
+          ctx.lineTo(x + p.w / 2, y + p.h + 5);
+          ctx.stroke();
+          // web circle around player
+          ctx.strokeStyle = 'rgba(156, 163, 175, 0.5)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(cx, y + 25, 30, 0, Math.PI * 2);
+          ctx.stroke();
+          // frozen indicator text
+          if (p.frozen > 30) { // only show for first part of freeze
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('WEBBED!', cx, y - 15);
+          }
+        }
         ctx.restore();
       }
 
@@ -1525,6 +1564,39 @@
           ctx.beginPath();
           ctx.arc(cx + 12, y + 20, 5, 0, Math.PI * 2);
           ctx.stroke();
+        } else if (e.type === 'spider') {
+          // spider on ceiling - creepy green with multiple eyes
+          ctx.fillStyle = '#10b981';
+          ctx.strokeStyle = '#047857';
+          ctx.lineWidth = 1.5;
+          // spider body (oval)
+          ctx.beginPath();
+          ctx.ellipse(cx, y + 12, 10, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          // multiple spider eyes (4 eyes)
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.arc(cx - 4, y + 10, 2, 0, Math.PI * 2);
+          ctx.arc(cx + 4, y + 10, 2, 0, Math.PI * 2);
+          ctx.arc(cx - 2, y + 8, 1.5, 0, Math.PI * 2);
+          ctx.arc(cx + 2, y + 8, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          // spider legs (8 legs, 4 on each side)
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          var legAngles = [-70, -50, -110, -130, 70, 50, 110, 130];
+          for (var li = 0; li < 8; li++) {
+            var angle = (legAngles[li] * Math.PI / 180) + Math.sin(Date.now() * 0.01 + li) * 0.1;
+            var legLen = 12;
+            ctx.beginPath();
+            ctx.moveTo(cx, y + 12);
+            var legX = cx + Math.cos(angle) * legLen;
+            var legY = y + 12 + Math.sin(angle) * legLen;
+            ctx.lineTo(legX, legY);
+            ctx.stroke();
+          }
         } else {
           // regular enemy eyes
           ctx.fillStyle = '#fff';
@@ -1810,16 +1882,29 @@
           p._speedBoost--;
           speedMul *= 1.4; // 40% faster
         }
-        var baseSpeed = 6 * speedMul;
-        if (g.k.left) {
-          p.vx = -baseSpeed;
-          p.right = 0
-        } else if (g.k.right) {
-          p.vx = baseSpeed;
-          p.right = 1
-        } else p.vx *= .8
-        // jump handling uses class max jumps
-        if (g.k.up && p.jl > 0) {
+        // handle frozen state
+        if (p.frozen > 0) {
+          p.frozen--;
+          if (p.gnd) {
+            // frozen on platform - can't move
+            p.vx = 0;
+          } else {
+            // frozen in air - maintain arc of travel
+            p.vx = p.frozenVx;
+            p.vy = p.frozenVy;
+          }
+        } else {
+          var baseSpeed = 6 * speedMul;
+          if (g.k.left) {
+            p.vx = -baseSpeed;
+            p.right = 0
+          } else if (g.k.right) {
+            p.vx = baseSpeed;
+            p.right = 1
+          } else p.vx *= .8
+        }
+        // jump handling uses class max jumps (can't jump when frozen)
+        if (g.k.up && p.jl > 0 && p.frozen <= 0) {
           p.vy = -14;
           p.jump = 1;
           p.gnd = 0;
@@ -1827,8 +1912,8 @@
           g.k.up = 0;
           jumpSound()
         }
-        // ranged attack (Archer) with auto-targeting and hold-to-draw
-        if (cls.ranged) {
+        // ranged attack (Archer) with auto-targeting and hold-to-draw (can't attack when frozen)
+        if (cls.ranged && p.frozen <= 0) {
           g.targetLock = findClosestTarget(p, g.cam);
           // start charging on attack press (if weapon is ready)
           if (g.k.attack && p.canShoot && !p.charging) {
@@ -1876,7 +1961,7 @@
           p.attackCd--;
           if (p.attackCd == 0) p.canShoot = 1
         }
-        if (g.k.swing && !p.swing) {
+        if (g.k.swing && !p.swing && p.frozen <= 0) {
           p.swing = 1;
           p.sf = 0;
           attackSound()
@@ -1888,7 +1973,9 @@
             p.sf = 0
           }
         }
-        p.vy += .6;
+        if (p.frozen <= 0 || !p.gnd) {
+          p.vy += .6;
+        }
         p.y += p.vy;
         p.x += p.vx;
         if (p.x < g.cam + 50) p.x = g.cam + 50;
@@ -2149,6 +2236,47 @@
                 }
               }
             }
+          } else if (e.type === 'spider') {
+            // spider crawls on ceiling and shoots webs
+            var speed = e.speed || 1.2;
+            
+            // crawl along ceiling (platform above)
+            e.x += e.vx;
+            if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
+            
+            // keep on ceiling (inverted from platform)
+            var plIdx = findPlatformIndexAtX(e.x, e.w);
+            if (plIdx !== -1) {
+              var platform = g.plat[plIdx];
+              e.y = platform.y - platform.h - 60; // stay above platform
+              e.onCeiling = true;
+            }
+            
+            // shoot web at player periodically
+            e._shootCooldown--;
+            if (e._shootCooldown <= 0 && Math.abs(p.x - e.x) < 400) {
+              // calculate trajectory to player
+              var ex = e.x + e.w / 2;
+              var ey = e.y + e.h;
+              var py = p.y + 20;
+              var angle = Math.atan2(py - ey, (p.x + 15) - ex);
+              var webSpeed = 6;
+              var vx = Math.cos(angle) * webSpeed;
+              var vy = Math.sin(angle) * webSpeed;
+              
+              var web = {
+                x: ex,
+                y: ey,
+                vx: vx,
+                vy: vy,
+                w: 12,
+                h: 12,
+                life: 150,
+                type: 'web'
+              };
+              g.projectiles.push(web);
+              e._shootCooldown = 90 + Math.floor(Math.random() * 60); // shoot every 1.5-2.5 seconds
+            }
           } else {
             // simple patrol behavior
             e.x += e.vx;
@@ -2255,6 +2383,18 @@
               damageSound();
               pr.life = 0;
               if (p.hp <= 0) endGame()
+            }
+          }
+          // spider web hits player
+          else if (pr.type === 'web') {
+            if (!p.dead && p.frozen <= 0 && coll({x: pr.x, y: pr.y, w: pr.w, h: pr.h}, 
+              {x: p.x + 5, y: p.y + 5, w: p.w - 10, h: p.h - 5})) {
+              // freeze player for ~2 seconds (120 frames at 60fps)
+              p.frozen = 120;
+              // capture current velocity to maintain arc if in air
+              p.frozenVx = p.vx;
+              p.frozenVy = p.vy;
+              pr.life = 0;
             }
           }
           
@@ -2443,6 +2583,29 @@
             ctx.lineTo(14, 4);
             ctx.closePath();
             ctx.fill();
+            ctx.restore();
+          } else if (pr.type === 'web') {
+            // draw web projectile
+            var px = pr.x - g.cam,
+              py = pr.y;
+            ctx.fillStyle = '#d1d5db';
+            ctx.strokeStyle = '#9ca3af';
+            ctx.lineWidth = 1;
+            // web blob
+            ctx.beginPath();
+            ctx.arc(px + 6, py + 6, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            // web strands
+            ctx.strokeStyle = 'rgba(156,163,175,0.5)';
+            ctx.lineWidth = 1;
+            for (var ws = 0; ws < 4; ws++) {
+              var angle = (ws * Math.PI / 2) + (pr.life * 0.1);
+              ctx.beginPath();
+              ctx.moveTo(px + 6, py + 6);
+              ctx.lineTo(px + 6 + Math.cos(angle) * 10, py + 6 + Math.sin(angle) * 10);
+              ctx.stroke();
+            }
             ctx.restore();
           } else {
             // default projectile - simplified for performance
