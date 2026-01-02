@@ -7,55 +7,60 @@
     <style>
       body {
         margin: 0;
-        padding: 20px;
+        padding: 0;
         background: #0f172a;
         font-family: Arial, sans-serif;
         display: flex;
         flex-direction: column;
         align-items: center;
-        min-height: 100vh;
+        height: 100vh;
+        overflow: hidden;
         color: #fff
       }
 
       #gameContainer {
         position: relative;
-        max-width: 800px;
         width: 100%;
-        height: 500px
+        max-width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+        min-height: 0
       }
 
       #gameCanvas {
-        width: 100%;
-        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
         border: 2px solid rgba(34, 211, 238, 0.3);
         border-radius: 16px;
         display: block;
-        box-shadow: 0 0 50px rgba(34, 211, 238, 0.2) 
+        box-shadow: 0 0 50px rgba(34, 211, 238, 0.2);
+        background: #000
       }
 
       .hud {
-        position: absolute;
-        top: 16px;
-        left: 16px;
         display: flex;
-        gap: 24px;
-        z-index: 10
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding: 4px 8px;
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 8px;
+        border: 1px solid rgba(34, 211, 238, 0.2)
       }
 
-      /* Centered top bar, positioned below the HUD to avoid overlap */
+      /* Best distance display in HUD */
       #bestDiffBar {
-        position: absolute;
-        top: 56px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 12;
         background: rgba(2, 6, 23, 0.7);
         padding: 6px 12px;
         border-radius: 12px;
         border: 1px solid rgba(34, 211, 238, 0.12);
         font-weight: 700;
         color: #cbd5e1;
-        pointer-events: none
+        font-size: 14px
       }
 
       @media(max-width:600px) {
@@ -70,23 +75,20 @@
 
       /* top-right HUD buttons (Upgrades / Settings) */
       #hudTopRight {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-        z-index: 13;
         display: flex;
-        gap: 8px
+        gap: 8px;
+        margin-left: auto
       }
 
       .stat {
         background: rgba(30, 41, 59, 0.9);
-        padding: 8px 16px;
-        border-radius: 20px;
+        padding: 2px 8px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 4px;
         font-weight: bold;
-        font-size: 18px
+        font-size: 14px
       }
 
       #healthStat {
@@ -113,16 +115,16 @@
       }
 
       #mainMenu {
-        position: absolute;
+        position: fixed;
         inset: 0;
         background: rgba(15, 23, 42, 0.95);
         display: flex;
         flex-direction: row;
         align-items: center;
-        justify-content: space-between;
-        border-radius: 16px;
+        justify-content: center;
+        border-radius: 0;
         z-index: 20;
-        padding: 40px;
+        padding: 20px;
         gap: 20px;
         flex-wrap: wrap
       }
@@ -133,21 +135,23 @@
 
       /* common overlay base to center modal-like screens */
       .overlay {
-        position: absolute;
+        position: fixed;
         inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 20;
-        padding: 20px
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.95)
       }
 
       #charPreviewSection {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 16px;
-        flex: 0 0 260px
+        gap: 12px;
+        flex: 0 0 auto;
+        max-width: 260px
       }
 
       #charPreviewCanvas {
@@ -179,9 +183,10 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 32px;
+        gap: 24px;
         flex: 1;
-        min-width: 260px
+        min-width: 260px;
+        max-width: 500px
       }
 
       #highScoreDisplay2 {
@@ -218,9 +223,20 @@
         box-shadow: 0 15px 40px rgba(34, 211, 238, 0.5)
       }
 
+      /* Canvas wrapper for overlays */
+      #canvasWrapper {
+        position: relative;
+        width: 100%;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center
+      }
+
       /* Upgrades UI */
       .upgradeOverlay {
-        position: absolute;
+        position: fixed;
         inset: 0;
         background: rgba(2, 6, 23, 0.92);
         display: flex;
@@ -363,15 +379,22 @@
       }
 
       .classSelectOverlay {
-        position: absolute;
+        position: fixed;
         inset: 0;
         background: rgba(15, 23, 42, 0.95);
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        border-radius: 16px;
-        z-index: 20
+        border-radius: 0;
+        z-index: 20;
+        padding: 20px;
+        overflow-y: auto
+      }
+
+      .classSelectOverlay > * {
+        max-width: 900px;
+        width: 100%
       }
 
       .menuButton {
@@ -496,9 +519,12 @@
         <button class="settingsBtn" onclick="goToUpgrades()">🛠 UPGRADES</button>
         <button class="settingsBtn" onclick="toggleFullscreen()" id="fullscreenBtn">⛶</button>
       </div>
-      <canvas id="gameCanvas" width="800" height="500"></canvas>
-      <canvas id="previewCanvas" width="800" height="500" style="display:none"></canvas>
-      <div id="mainMenu" class="overlay classSelectOverlay">
+      <div id="canvasWrapper">
+        <canvas id="gameCanvas"></canvas>
+      </div>
+    </div>
+    <canvas id="previewCanvas" width="800" height="500" style="display:none"></canvas>
+    <div id="mainMenu" class="overlay classSelectOverlay">
         <div id="charPreviewSection">
           <canvas id="charPreviewCanvas" width="250" height="280" style="display:block"></canvas>
           <button class="changeCharBtn" onclick="goToClassSelect()">⚙ CHANGE CHARACTER</button>
@@ -627,14 +653,13 @@
         </div>
         <button class="menuButton" onclick="goToMainMenu()" style="background:linear-gradient(to right,#64748b,#475569);margin-top:12px">← MAIN MENU</button>
       </div>
-    </div>
     <div class="controls">
       <button class="control-btn" onmousedown="key('left',1)" onmouseup="key('left',0)" ontouchstart="key('left',1)" ontouchend="key('left',0)">←</button>
       <button class="control-btn jump" onmousedown="key('up',1)" onmouseup="key('up',0)" ontouchstart="key('up',1)" ontouchend="key('up',0)">JUMP</button>
       <button class="control-btn attack" onmousedown="key('swing',1)" onmouseup="key('swing',0)" ontouchstart="key('swing',1)" ontouchend="key('swing',0)">⚔️</button>
       <button class="control-btn" onmousedown="key('right',1)" onmouseup="key('right',0)" ontouchstart="key('right',1)" ontouchend="key('right',0)">→</button>
     </div>
-    <p style="color:#64748b;font-size:14px;margin-top:16px">← → or A/D to move • ↑ or W or SPACE to jump • SHIFT to attack</p>
+    <p style="color:#64748b;font-size:10px;margin:0;padding:2px 0">← → or A/D to move • ↑ or W or SPACE to jump • SHIFT to attack</p>
     <div id="errorLog" style="display:none;position:fixed;bottom:10px;right:10px;background:rgba(239,68,68,0.95);color:#fff;padding:12px 16px;border-radius:8px;max-width:400px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:11px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong>🐛 Error Log</strong>
@@ -672,6 +697,55 @@
         ctx = c.getContext('2d'),
         W = 800,
         H = 500;
+      
+      // Function to resize canvas to fit screen
+      function resizeCanvas() {
+        var wrapper = document.getElementById('canvasWrapper');
+        if (!wrapper) return;
+        
+        var wrapperRect = wrapper.getBoundingClientRect();
+        var availableWidth = wrapperRect.width - 10; // Minimal margin for wider canvas
+        var availableHeight = wrapperRect.height - 10;
+        
+        // Allow wider aspect ratio (2:1 instead of strict 16:10)
+        var minAspectRatio = 1.5; // Minimum width:height ratio
+        var maxAspectRatio = 2.2; // Maximum width:height ratio
+        var targetAspectRatio = availableWidth / availableHeight;
+        
+        // Clamp aspect ratio within bounds
+        if (targetAspectRatio < minAspectRatio) targetAspectRatio = minAspectRatio;
+        if (targetAspectRatio > maxAspectRatio) targetAspectRatio = maxAspectRatio;
+        
+        var newWidth = availableWidth;
+        var newHeight = newWidth / targetAspectRatio;
+        
+        if (newHeight > availableHeight) {
+          newHeight = availableHeight;
+          newWidth = newHeight * targetAspectRatio;
+        }
+        
+        // Ensure minimum size
+        if (newWidth < 400) newWidth = 400;
+        if (newHeight < 250) newHeight = 250;
+        
+        // Set canvas dimensions
+        c.width = Math.floor(newWidth);
+        c.height = Math.floor(newHeight);
+        
+        // Update game dimensions
+        W = c.width;
+        H = c.height;
+      }
+      
+      // Initial resize
+      resizeCanvas();
+      setTimeout(resizeCanvas, 100);
+      setTimeout(resizeCanvas, 500);
+      
+      // Resize on window resize
+      window.addEventListener('resize', function() {
+        resizeCanvas();
+      });
       // Cookie management
       function getCookie(name) {
         var nameEQ = name + "=";
@@ -809,6 +883,162 @@
       function rnd(a, b) {
         return Math.random() * (b - a) + a
       }
+      
+      // A* pathfinding for platform navigation (Minecraft-style)
+      function findPlatformPathAStar(startIdx, goalIdx, platforms) {
+        if (startIdx === -1 || goalIdx === -1 || startIdx === goalIdx) return null;
+        if (!platforms[startIdx] || !platforms[goalIdx]) return null;
+        
+        // Heuristic: Manhattan distance between platform centers
+        function heuristic(idx1, idx2) {
+          var p1 = platforms[idx1], p2 = platforms[idx2];
+          if (!p1 || !p2) return 9999;
+          return Math.abs((p1.x + p1.w/2) - (p2.x + p2.w/2)) + Math.abs(p1.y - p2.y);
+        }
+        
+        // Check if there's a safe landing platform below a point
+        function hasPlatformBelow(x, y, maxFallDist) {
+          for (var i = 0; i < platforms.length; i++) {
+            var plat = platforms[i];
+            if (!plat) continue;
+            // Check if point is above platform horizontally
+            if (x >= plat.x && x <= plat.x + plat.w) {
+              // Check if platform is below but within safe fall distance
+              if (plat.y > y && plat.y - y < maxFallDist) {
+                return !plat.spikes; // platform exists and is safe (no spikes)
+              }
+            }
+          }
+          return false; // no platform found = void (value 0)
+        }
+        
+        // Check if we can safely jump from platform A to B
+        function canSafelyJump(fromIdx, toIdx) {
+          var from = platforms[fromIdx], to = platforms[toIdx];
+          if (!from || !to) return false; // invalid platforms (value 0)
+          
+          // Don't jump to spike platforms
+          if (to.spikes) return false; // unsafe platform (value 0)
+          
+          // Calculate gap and height difference
+          var gap = to.x > from.x ? 
+            (to.x - (from.x + from.w)) : 
+            (from.x - (to.x + to.w));
+          var heightDiff = from.y - to.y; // positive if jumping up
+          
+          // Can't jump too far horizontally (max ~200px for safety)
+          if (gap > 200) return false; // unreachable (value 0)
+          
+          // Can't jump too high (max ~140px)
+          if (heightDiff > 140) return false; // unreachable (value 0)
+          
+          // Check if falling down - must have safe landing
+          if (heightDiff < 0) { // jumping down
+            var fallDist = Math.abs(heightDiff);
+            if (fallDist > 150) return false; // too far to fall safely (value 0)
+            
+            // Verify there's actually a platform to land on (not void)
+            var targetX = to.x + to.w / 2;
+            if (!hasPlatformBelow(targetX, from.y, 200)) {
+              return false; // void below - don't jump (value 0)
+            }
+          }
+          
+          // For horizontal or upward jumps, check the gap
+          if (gap > 20) {
+            // Check if there's void in the gap by sampling points
+            var jumpMidX = from.x > to.x ? 
+              from.x - gap / 2 : 
+              from.x + from.w + gap / 2;
+            var jumpMidY = from.y - 50; // approximate jump arc height
+            
+            // Make sure there's a platform below the jump arc
+            if (!hasPlatformBelow(jumpMidX, jumpMidY, 300)) {
+              return false; // void in jump path (value 0)
+            }
+          }
+          
+          return true; // safe jump (value 1)
+        }
+        
+        // Get neighbors (reachable platforms)
+        function getNeighbors(idx) {
+          var neighbors = [];
+          var current = platforms[idx];
+          if (!current) return neighbors;
+          
+          for (var i = 0; i < platforms.length; i++) {
+            if (i === idx || !platforms[i]) continue;
+            if (canSafelyJump(idx, i)) {
+              neighbors.push(i); // valid neighbor (value 1)
+            }
+          }
+          return neighbors;
+        }
+        
+        // A* algorithm
+        var openSet = [startIdx];
+        var cameFrom = {};
+        var gScore = {};
+        var fScore = {};
+        
+        for (var i = 0; i < platforms.length; i++) {
+          gScore[i] = 9999;
+          fScore[i] = 9999;
+        }
+        gScore[startIdx] = 0;
+        fScore[startIdx] = heuristic(startIdx, goalIdx);
+        
+        var iterations = 0;
+        var maxIterations = 100; // prevent infinite loops
+        
+        while (openSet.length > 0 && iterations < maxIterations) {
+          iterations++;
+          
+          // Find node in openSet with lowest fScore
+          var current = openSet[0];
+          var lowestF = fScore[current];
+          for (var i = 1; i < openSet.length; i++) {
+            if (fScore[openSet[i]] < lowestF) {
+              current = openSet[i];
+              lowestF = fScore[current];
+            }
+          }
+          
+          // Reached goal
+          if (current === goalIdx) {
+            // Reconstruct path
+            var path = [current];
+            while (cameFrom[current] !== undefined) {
+              current = cameFrom[current];
+              path.unshift(current);
+            }
+            return path;
+          }
+          
+          // Remove current from openSet
+          openSet.splice(openSet.indexOf(current), 1);
+          
+          // Check neighbors
+          var neighbors = getNeighbors(current);
+          for (var i = 0; i < neighbors.length; i++) {
+            var neighbor = neighbors[i];
+            var tentativeG = gScore[current] + heuristic(current, neighbor);
+            
+            if (tentativeG < gScore[neighbor]) {
+              cameFrom[neighbor] = current;
+              gScore[neighbor] = tentativeG;
+              fScore[neighbor] = gScore[neighbor] + heuristic(neighbor, goalIdx);
+              
+              if (openSet.indexOf(neighbor) === -1) {
+                openSet.push(neighbor);
+              }
+            }
+          }
+        }
+        
+        return null; // No path found - void blocks the way (value 0)
+      }
 
       function genPlat(x, prevPlat) {
         var gap = rnd(80, 180),
@@ -871,6 +1101,16 @@
         if (rand > 0.75) type = 'hunter';
         else if (rand > 0.65) type = 'spider'; // 10% chance for spider
         else if (rand > 0.55) type = 'archer'; // 10% chance for archer
+        
+        // Randomly determine weapon tier for normal enemies
+        var weaponTier = 0; // 0 = unarmed, 1 = knife, 2 = sword
+        if (type === 'normal') {
+          var tierRand = Math.random();
+          if (tierRand > 0.8) weaponTier = 2; // 20% chance for sword
+          else if (tierRand > 0.5) weaponTier = 1; // 30% chance for knife
+          // else 50% chance for unarmed
+        }
+        
         var en = {
           x: p.x + p.w / 2,
           y: p.y - 40,
@@ -886,6 +1126,10 @@
           vy: 0,
           gnd: 0,
           jl: 0,
+          weaponTier: weaponTier,
+          attacking: 0,
+          attackFrame: 0,
+          attackCooldown: 0,
           // AI state
           _path: null,
           _pathTimer: 0,
@@ -897,8 +1141,19 @@
         };
         if (type === 'hunter') {
           en.hp = 3;
-          en.speed = 3;
+          en.speed = 2.5;
           en.jl = 2;
+          en.maxJumps = 2;
+          en._platformPath = null;
+          en._pathIndex = 0;
+          en._recalcTimer = 0;
+          en._targetPlatform = null;
+          en._stuckTimer = 0;
+          en._lastX = 0;
+          // Spawn hunters directly on platform to prevent falling
+          en.y = p.y - en.h;
+          en.gnd = 1;
+          en.vx = 0; // start stationary
         } else if (type === 'archer') {
           en.hp = 2;
           en.speed = 1.5;
@@ -906,9 +1161,19 @@
         } else if (type === 'spider') {
           en.hp = 2;
           en.speed = 1.2;
+          en.w = 40;
+          en.h = 35;
           en._shootCooldown = 90; // initial cooldown
-          en.y = p.y - p.h - 60; // spawn above platform (on ceiling)
+          en.y = p.y - p.h - 120; // spawn higher above platform (out of reach)
           en.onCeiling = true;
+          en._swinging = false;
+          en._swingTimer = 0;
+          en._swingAngle = 0;
+          en._swingSpeed = 0;
+          en._anchorX = 0;
+          en._anchorY = 0;
+          en._swingLen = 80; // dynamic web length
+          en._attackMode = 'shoot'; // 'shoot' or 'swing'
         }
         return en
       }
@@ -1538,7 +1803,7 @@
           ctx.arc(cx - 3, y + 6, 2.5, 0, Math.PI * 2);
           ctx.arc(cx + 3, y + 6, 2.5, 0, Math.PI * 2);
           ctx.stroke();
-          // archer body and bow
+          // archer body
           ctx.strokeStyle = '#0ea5e9';
           ctx.lineWidth = 2.5;
           ctx.lineCap = 'round';
@@ -1547,56 +1812,199 @@
           ctx.lineTo(cx, y + 30);
           ctx.stroke();
           ctx.beginPath();
-          ctx.moveTo(cx, y + 20);
-          ctx.lineTo(cx - 8, y + 26);
-          ctx.moveTo(cx, y + 20);
-          ctx.lineTo(cx + 8, y + 26);
-          ctx.stroke();
-          ctx.beginPath();
           ctx.moveTo(cx, y + 30);
           ctx.lineTo(cx - 6, y + 40);
           ctx.moveTo(cx, y + 30);
           ctx.lineTo(cx + 6, y + 40);
           ctx.stroke();
-          // draw bow in hand
-          ctx.strokeStyle = '#0891b2';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(cx + 12, y + 20, 5, 0, Math.PI * 2);
-          ctx.stroke();
-        } else if (e.type === 'spider') {
-          // spider on ceiling - creepy green with multiple eyes
-          ctx.fillStyle = '#10b981';
-          ctx.strokeStyle = '#047857';
-          ctx.lineWidth = 1.5;
-          // spider body (oval)
-          ctx.beginPath();
-          ctx.ellipse(cx, y + 12, 10, 8, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          // multiple spider eyes (4 eyes)
-          ctx.fillStyle = '#fbbf24';
-          ctx.beginPath();
-          ctx.arc(cx - 4, y + 10, 2, 0, Math.PI * 2);
-          ctx.arc(cx + 4, y + 10, 2, 0, Math.PI * 2);
-          ctx.arc(cx - 2, y + 8, 1.5, 0, Math.PI * 2);
-          ctx.arc(cx + 2, y + 8, 1.5, 0, Math.PI * 2);
-          ctx.fill();
-          // spider legs (8 legs, 4 on each side)
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 2;
+          
+          // bow in hand - points at player when drawing/shooting
+          ctx.save();
+          
+          // calculate angle to player
+          var px = g.p.x + g.p.w / 2 - g.cam;
+          var py = g.p.y + g.p.h / 2;
+          var angleToPlayer = Math.atan2(py - (y + 20), px - cx);
+          
+          // draw bow-holding arm first
+          var bowArmLen = 12;
+          var bowHandX = cx + Math.cos(angleToPlayer) * bowArmLen;
+          var bowHandY = y + 20 + Math.sin(angleToPlayer) * bowArmLen;
+          
+          ctx.strokeStyle = '#0ea5e9';
+          ctx.lineWidth = 2.5;
           ctx.lineCap = 'round';
-          var legAngles = [-70, -50, -110, -130, 70, 50, 110, 130];
-          for (var li = 0; li < 8; li++) {
-            var angle = (legAngles[li] * Math.PI / 180) + Math.sin(Date.now() * 0.01 + li) * 0.1;
-            var legLen = 12;
+          ctx.beginPath();
+          ctx.moveTo(cx, y + 20);
+          ctx.lineTo(bowHandX, bowHandY);
+          ctx.stroke();
+          
+          // position bow at hand
+          ctx.translate(bowHandX, bowHandY);
+          ctx.rotate(angleToPlayer);
+          
+          // calculate draw amount (0 to 1)
+          var drawAmount = 0;
+          if (e._drawing && e._drawProgress) {
+            drawAmount = Math.min(1, e._drawProgress / e._drawDuration);
+          }
+          
+          // bow limb with bending based on draw
+          var bendAmount = drawAmount * 5; // pixels to bend
+          ctx.strokeStyle = '#8b4513';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          
+          // bow curves outward when drawn
+          ctx.beginPath();
+          ctx.moveTo(0, -8);
+          ctx.quadraticCurveTo(8 + bendAmount, 0, 0, 8);
+          ctx.stroke();
+          
+          // bow string - pulled back when drawing
+          var stringPull = drawAmount * 12; // how far back string is pulled
+          ctx.strokeStyle = '#d4d4d8';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, -8);
+          if (drawAmount > 0) {
+            // string is pulled back in a curve
+            ctx.quadraticCurveTo(-stringPull, 0, 0, 8);
+          } else {
+            // straight string when not drawn
+            ctx.lineTo(0, 8);
+          }
+          ctx.stroke();
+          
+          // draw nocked arrow when drawing
+          if (drawAmount > 0) {
+            ctx.strokeStyle = '#6b7280';
+            ctx.lineWidth = 2;
+            var arrowX = -stringPull;
             ctx.beginPath();
-            ctx.moveTo(cx, y + 12);
-            var legX = cx + Math.cos(angle) * legLen;
-            var legY = y + 12 + Math.sin(angle) * legLen;
-            ctx.lineTo(legX, legY);
+            ctx.moveTo(arrowX, 0);
+            ctx.lineTo(arrowX + 15, 0);
+            ctx.stroke();
+            // arrow head
+            ctx.beginPath();
+            ctx.moveTo(arrowX + 15, 0);
+            ctx.lineTo(arrowX + 12, -2);
+            ctx.moveTo(arrowX + 15, 0);
+            ctx.lineTo(arrowX + 12, 2);
             ctx.stroke();
           }
+          
+          ctx.restore();
+          
+          // off-hand arm (pulling string back)
+          if (drawAmount > 0) {
+            var pullBackDist = drawAmount * 12;
+            var stringHandX = bowHandX + Math.cos(angleToPlayer) * (-pullBackDist);
+            var stringHandY = bowHandY + Math.sin(angleToPlayer) * (-pullBackDist);
+            
+            ctx.strokeStyle = '#0ea5e9';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, y + 20);
+            ctx.lineTo(stringHandX, stringHandY);
+            ctx.stroke();
+          } else {
+            // idle off-hand
+            var armAngle = angleToPlayer - Math.PI / 6;
+            ctx.strokeStyle = '#0ea5e9';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, y + 20);
+            ctx.lineTo(cx + Math.cos(armAngle) * 10, y + 20 + Math.sin(armAngle) * 10);
+            ctx.stroke();
+          }
+        } else if (e.type === 'spider') {
+          // spider on ceiling - black/dark realistic spider like the jpeg
+          var bodyCenterY = y + 18;
+          ctx.shadowColor = 'rgba(0,0,0,0.5)';
+          ctx.shadowBlur = 10;
+          
+          // spider legs (8 legs, 4 on each side) - long thin dark legs
+          ctx.strokeStyle = '#1f2937';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          var legPairs = [
+            [-85, 22], [-60, 24], [-105, 20], [-125, 18],  // left side
+            [85, 22], [60, 24], [105, 20], [125, 18]        // right side
+          ];
+          for (var li = 0; li < 8; li++) {
+            var legAngle = (legPairs[li][0] * Math.PI / 180) + Math.sin(Date.now() * 0.008 + li) * 0.12;
+            var legLen = legPairs[li][1];
+            // two-segment leg for more realistic look
+            var midLen = legLen * 0.55;
+            var endLen = legLen * 0.45;
+            
+            ctx.beginPath();
+            ctx.moveTo(cx, bodyCenterY);
+            var midX = cx + Math.cos(legAngle) * midLen;
+            var midY = bodyCenterY + Math.sin(legAngle) * midLen;
+            ctx.lineTo(midX, midY);
+            
+            // second segment bends down slightly
+            var endAngle = legAngle + (li < 4 ? -0.5 : 0.5);
+            var endX = midX + Math.cos(endAngle) * endLen;
+            var endY = midY + Math.sin(endAngle) * endLen;
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            // leg joints (thicker at joints)
+            ctx.fillStyle = '#374151';
+            ctx.beginPath();
+            ctx.arc(midX, midY, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
+          // spider body - round and dark black/gray
+          var bodyGrad = ctx.createRadialGradient(cx - 3, bodyCenterY - 3, 2, cx, bodyCenterY, 16);
+          bodyGrad.addColorStop(0, '#4b5563');
+          bodyGrad.addColorStop(0.7, '#1f2937');
+          bodyGrad.addColorStop(1, '#111827');
+          ctx.fillStyle = bodyGrad;
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx, bodyCenterY, 16, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          
+          // smaller head section in front
+          var headGrad = ctx.createRadialGradient(cx - 1, bodyCenterY - 12, 1, cx, bodyCenterY - 10, 6);
+          headGrad.addColorStop(0, '#4b5563');
+          headGrad.addColorStop(1, '#1f2937');
+          ctx.fillStyle = headGrad;
+          ctx.beginPath();
+          ctx.arc(cx, bodyCenterY - 10, 7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          
+          // spider eyes - small red/orange glowing dots
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = '#ef4444';
+          ctx.fillStyle = '#ef4444';
+          // two main front eyes
+          ctx.beginPath();
+          ctx.arc(cx - 3, bodyCenterY - 12, 1.5, 0, Math.PI * 2);
+          ctx.arc(cx + 3, bodyCenterY - 12, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // body texture/markings
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 1;
+          ctx.globalAlpha = 0.3;
+          ctx.beginPath();
+          ctx.arc(cx, bodyCenterY, 12, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          
+          ctx.shadowBlur = 0;
         } else {
           // regular enemy eyes
           ctx.fillStyle = '#fff';
@@ -1617,18 +2025,159 @@
           ctx.moveTo(cx, y + 16);
           ctx.lineTo(cx, y + 30);
           ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(cx, y + 20);
-          ctx.lineTo(cx - 8, y + 26);
-          ctx.moveTo(cx, y + 20);
-          ctx.lineTo(cx + 8, y + 26);
-          ctx.stroke();
+          // legs
           ctx.beginPath();
           ctx.moveTo(cx, y + 30);
           ctx.lineTo(cx - 6, y + 40);
           ctx.moveTo(cx, y + 30);
           ctx.lineTo(cx + 6, y + 40);
           ctx.stroke();
+          
+          // weapon rendering and attack animations
+          var tier = e.weaponTier || 0;
+          var sd = e.vx > 0 ? 1 : -1;
+          
+          if (e.attacking) {
+            var progress = e.attackFrame / 15;
+            var attackAngle = 0;
+            
+            if (tier === 0) {
+              // unarmed - punching animation
+              attackAngle = Math.sin(progress * Math.PI) * Math.PI / 3;
+              var armLen = 12;
+              var armX = cx + Math.cos(attackAngle) * armLen * sd;
+              var armY = y + 22 + Math.sin(attackAngle) * armLen;
+              
+              ctx.strokeStyle = '#dc2626';
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.moveTo(cx, y + 20);
+              ctx.lineTo(armX, armY);
+              ctx.stroke();
+              
+              // fist
+              ctx.fillStyle = '#b91c1c';
+              ctx.beginPath();
+              ctx.arc(armX, armY, 4, 0, Math.PI * 2);
+              ctx.fill();
+              
+              // back arm
+              ctx.strokeStyle = '#dc2626';
+              ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              ctx.moveTo(cx, y + 20);
+              ctx.lineTo(cx - 8 * sd, y + 26);
+              ctx.stroke();
+            } else if (tier === 1) {
+              // knife jab/thrust animation (forward motion)
+              var thrust = progress < 0.5 ? progress * 2 : (1 - (progress - 0.5) * 2); // 0 to 1 to 0
+              var extendDist = thrust * 10; // extend only 10 pixels max for more natural look
+              var armX = cx + (8 + extendDist) * sd;
+              var armY = y + 22;
+              
+              ctx.strokeStyle = '#dc2626';
+              ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              ctx.moveTo(cx, y + 20);
+              ctx.lineTo(armX, armY);
+              ctx.stroke();
+              
+              // knife blade extending forward
+              var bladeLen = 15;
+              var bladeX = armX + bladeLen * sd;
+              var bladeY = armY;
+              
+              ctx.strokeStyle = '#94a3b8';
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.moveTo(armX, armY);
+              ctx.lineTo(bladeX, bladeY);
+              ctx.stroke();
+              
+              // blade tip
+              ctx.strokeStyle = '#cbd5e1';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(bladeX - 3 * sd, bladeY);
+              ctx.lineTo(bladeX, bladeY);
+              ctx.stroke();
+              
+              // back arm
+              ctx.strokeStyle = '#dc2626';
+              ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              ctx.moveTo(cx, y + 20);
+              ctx.lineTo(cx - 8 * sd, y + 26);
+              ctx.stroke();
+            } else if (tier === 2) {
+              // sword attack animation (like player)
+              attackAngle = (e.attackFrame / 15) * Math.PI - Math.PI / 4;
+              var armLen = 12;
+              var armX = cx + Math.cos(attackAngle) * armLen * sd;
+              var armY = y + 25 + Math.sin(attackAngle) * armLen;
+              
+              ctx.strokeStyle = '#dc2626';
+              ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              ctx.moveTo(cx, y + 25);
+              ctx.lineTo(armX, armY);
+              ctx.stroke();
+              
+              // sword
+              var swordLen = 28;
+              var swordX = armX + Math.cos(attackAngle) * swordLen * sd;
+              var swordY = armY + Math.sin(attackAngle) * swordLen;
+              
+              ctx.shadowColor = '#fbbf24';
+              ctx.shadowBlur = 6;
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 5;
+              ctx.beginPath();
+              ctx.moveTo(armX, armY);
+              ctx.lineTo(swordX, swordY);
+              ctx.stroke();
+              ctx.strokeStyle = '#f59e0b';
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.moveTo(armX, armY);
+              ctx.lineTo(swordX, swordY);
+              ctx.stroke();
+              ctx.shadowBlur = 0;
+            }
+          } else {
+            // idle state - draw normal arms
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, y + 20);
+            ctx.lineTo(cx - 8, y + 26);
+            ctx.moveTo(cx, y + 20);
+            ctx.lineTo(cx + 8, y + 26);
+            ctx.stroke();
+            
+            // idle weapon display
+            if (tier === 1) {
+              // small knife at side
+              var knifeX = cx + 10 * sd;
+              var knifeY = y + 28;
+              ctx.strokeStyle = '#94a3b8';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(knifeX, knifeY);
+              ctx.lineTo(knifeX + 8 * sd, knifeY + 6);
+              ctx.stroke();
+            } else if (tier === 2) {
+              // sword at side
+              var swordX = cx + 8 * sd;
+              var swordY = y + 26;
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.moveTo(swordX, swordY);
+              ctx.lineTo(swordX + 6 * sd, swordY + 20);
+              ctx.stroke();
+            }
+          }
         }
         // hp indicator
         if (e.hp > 0) {
@@ -1885,14 +2434,8 @@
         // handle frozen state
         if (p.frozen > 0) {
           p.frozen--;
-          if (p.gnd) {
-            // frozen on platform - can't move
-            p.vx = 0;
-          } else {
-            // frozen in air - maintain arc of travel
-            p.vx = p.frozenVx;
-            p.vy = p.frozenVy;
-          }
+          // frozen - can't control movement but still affected by gravity
+          p.vx = 0;
         } else {
           var baseSpeed = 6 * speedMul;
           if (g.k.left) {
@@ -1973,13 +2516,11 @@
             p.sf = 0
           }
         }
-        if (p.frozen <= 0 || !p.gnd) {
-          p.vy += .6;
-        }
+        p.vy += .6;
         p.y += p.vy;
         p.x += p.vx;
         if (p.x < g.cam + 50) p.x = g.cam + 50;
-        var tc = p.x - 300;
+        var tc = p.x - W * 0.4; // Center player at 40% from left (more centered)
         if (tc > g.cam) g.cam = tc;
         if (Math.abs(p.vx) > .5) p.f += .5;
         if (p.inv > 0) p.inv--;
@@ -2030,149 +2571,174 @@
         for (var i = 0; i < g.en.length; i++) {
           var e = g.en[i];
           if (e.dead) continue;
-          // hunter behavior: Grid-based pathfinding + Behavior Tree AI
+          // hunter behavior: Minecraft-style platform pathfinding
           if (e.type === 'hunter') {
-            var speed = (e.speed || 2.2);
+            var speed = e.speed || 2.5;
+            var targetPlatIdx = findPlatformIndexAtX(p.x, p.w);
+            var currentPlatIdx = findPlatformIndexAtX(e.x, e.w);
             
-            // Initialize behavior tree if not set
-            if (!e._behaviorTree) {
-              if (typeof createHunterBehaviorTree === 'function') {
-                e._behaviorTree = createHunterBehaviorTree();
+            // Don't move if not on a valid platform (prevents void walking)
+            if (currentPlatIdx === -1) {
+              e.vx = 0;
+              e.vy = (e.vy || 0) + 0.6;
+              e.y += e.vy;
+              e.x += e.vx;
+            } else {
+              // Stuck detection (like Minecraft mobs)
+              if (Math.abs(e.x - (e._lastX || 0)) < 0.5) {
+                e._stuckTimer = (e._stuckTimer || 0) + 1;
               } else {
-                e._behaviorTree = function() { return 'success'; }; // Fallback
+                e._stuckTimer = 0;
               }
-              e._btState = 'ATTACKING'; // Start in attacking mode
-              e._pathRecalcTimer = 0;
-              e._gridPath = null;
-              e._currentTarget = null;
-              e._cachedPlayer = p;
-            }
-            
-            // Update cached player reference
-            e._cachedPlayer = p;
-            
-            // Decrement timers
-            if (e._pathRecalcTimer > 0) e._pathRecalcTimer--;
-            
-            // Run behavior tree to determine state
-            if (e._behaviorTree) e._behaviorTree(e);
-            
-            // If no state set or stuck in idle, force attacking
-            if (!e._btState || e._btState === 'IDLE') {
-              e._btState = 'ATTACKING';
-            }
-            
-            // Execute behavior based on state
-            if (e._btState === 'CALCULATING_PATH') {
-              // Calculate grid-based path to player
-              if (typeof findGridPath === 'function') {
-                var path = findGridPath(e.x + e.w / 2, e.y + e.h / 2, p.x + p.w / 2, p.y + p.h / 2);
-                if (path && path.length > 1) {
-                  e._gridPath = path;
-                  e._pathIndex = 0;
-                  e._btState = 'FOLLOWING_PATH';
-                } else {
-                  e._btState = 'IDLE';
-                }
-              } else {
-                // Fallback to simple chase
-                e._btState = 'ATTACKING';
-              }
-            }
-            
-            if (e._btState === 'FOLLOWING_PATH' && e._gridPath && e._gridPath.length > 1) {
-              // Follow grid path
-              var nextCell = e._gridPath[1]; // Next waypoint
-              if (typeof gridToWorld === 'function') {
-                var targetPos = gridToWorld(nextCell.gx, nextCell.gy);
-                e._currentTarget = targetPos;
+              e._lastX = e.x;
               
-                var dx = targetPos.x - (e.x + e.w / 2);
-                var dy = targetPos.y - (e.y + e.h / 2);
-                var dist = Math.sqrt(dx * dx + dy * dy);
+              // Recalculate path periodically or when stuck
+              e._recalcTimer = (e._recalcTimer || 0) - 1;
+              if (e._recalcTimer <= 0 || e._stuckTimer > 30 || !e._platformPath) {
+                e._platformPath = findPlatformPathAStar(currentPlatIdx, targetPlatIdx, g.plat);
+                e._pathIndex = 0;
+                e._recalcTimer = 45; // recalc every 0.75 seconds
+                e._stuckTimer = 0;
+              }
+            
+              // Check distance to player for attack
+              var distToPlayer = Math.abs((p.x + p.w/2) - (e.x + e.w/2));
+              var vertDistToPlayer = Math.abs(p.y - e.y);
+              
+              // Attack if close enough (hunters use unarmed attacks)
+              if (distToPlayer < 40 && vertDistToPlayer < 50 && e.attackCooldown <= 0) {
+                e.attacking = 1;
+                e.attackFrame = 0;
+                e.attackCooldown = 35;
+                e.vx = 0; // stop while attacking
+              }
+              
+              // Follow calculated path (only if not attacking)
+              if (!e.attacking && e._platformPath && e._platformPath.length > 1) {
+                var nextPlatIdx = e._platformPath[Math.min(e._pathIndex + 1, e._platformPath.length - 1)];
+                var nextPlat = g.plat[nextPlatIdx];
+                var currentPlat = g.plat[currentPlatIdx];
                 
-                // Move towards target
-                if (Math.abs(dx) > 10) {
-                  e.vx = Math.sign(dx) * speed;
-                } else {
-                  e.vx = 0;
-                }
-                
-                // Jump if needed (target is above or far away)
-                if (e.gnd && e.jl > 0) {
-                  var needsJump = dy < -20 || (Math.abs(dx) > 60 && Math.abs(dy) < 80);
-                  if (needsJump) {
+                if (nextPlat) {
+                  var targetX = nextPlat.x + nextPlat.w / 2;
+                  var dx = targetX - (e.x + e.w / 2);
+                  var dist = Math.abs(dx);
+                  
+                  // Check if we need to jump to reach next platform
+                  var needsJump = false;
+                  if (currentPlat && nextPlat) {
+                    var gap = nextPlat.x > currentPlat.x ?
+                      (nextPlat.x - (currentPlat.x + currentPlat.w)) :
+                      (currentPlat.x - (nextPlat.x + nextPlat.w));
+                    var heightDiff = currentPlat.y - nextPlat.y;
+                    
+                    // Jump if there's a gap or platform is higher
+                    needsJump = gap > 10 || heightDiff > 5;
+                  }
+                  
+                  // Safety check: don't walk off platform edge without jumping
+                  var platformEdgeLeft = currentPlat.x;
+                  var platformEdgeRight = currentPlat.x + currentPlat.w;
+                  var willWalkOff = false;
+                  if (dx > 0) { // moving right
+                    willWalkOff = (e.x + e.w + speed * 2) > platformEdgeRight && !needsJump;
+                  } else if (dx < 0) { // moving left
+                    willWalkOff = (e.x - speed * 2) < platformEdgeLeft && !needsJump;
+                  }
+                  
+                  // Move toward target only if safe
+                  if (!willWalkOff) {
+                    if (dist > 20) {
+                      e.vx = Math.sign(dx) * speed;
+                    } else {
+                      e.vx = Math.sign(dx) * speed * 0.5;
+                    }
+                  } else {
+                    e.vx = 0; // stop at edge
+                  }
+                  
+                  // Execute jump when needed and on ground
+                  if (needsJump && e.gnd && e.jl > 0) {
                     e.vy = -13;
                     e.gnd = 0;
                     e.jl--;
                   }
-                }
-                
-                // Reached waypoint, advance to next
-                if (dist < 30) {
-                  e._gridPath.shift();
-                  if (e._gridPath.length <= 1) {
-                    e._gridPath = null;
-                    e._btState = 'ATTACKING';
+                  
+                  // Advance to next waypoint when close
+                  if (dist < 30 && Math.abs(e.y - nextPlat.y) < 20) {
+                    e._pathIndex++;
+                    if (e._pathIndex >= e._platformPath.length - 1) {
+                      // Reached end of path, recalculate
+                      e._recalcTimer = 0;
+                    }
                   }
                 }
-              } else {
-                // Fallback if gridToWorld not available
-                e._btState = 'ATTACKING';
-              }
-            }
-            
-            if (e._btState === 'ATTACKING') {
-              // Direct pursuit of player
-              var dx = p.x - e.x;
-              var dy = p.y - e.y;
-              var dist = Math.sqrt(dx * dx + dy * dy);
-              
-              if (Math.abs(dx) > 20) {
-                e.vx = Math.sign(dx) * speed * 1.3;
-              } else {
-                e.vx = 0;
+              } else if (!e.attacking) {
+                // No path found - try direct approach if close
+                var dx = p.x - e.x;
+                if (distToPlayer < 150 && vertDistToPlayer < 50) {
+                  if (Math.abs(dx) > 20) {
+                    e.vx = Math.sign(dx) * speed * 0.5;
+                  }
+                } else {
+                  e.vx = 0;
+                }
               }
               
-              // Jump towards player if needed
-              if (e.gnd && e.jl > 0 && (dy < -40 || (Math.abs(dx) > 70 && dist > 100))) {
-                e.vy = -13;
-                e.gnd = 0;
-                e.jl--;
+              // Handle attack animation and hitbox
+              if (e.attacking) {
+                e.attackFrame++;
+                e.vx = 0; // don't move during attack
+                
+                // Unarmed punch hitbox (frame 5-10)
+                if (e.attackFrame >= 5 && e.attackFrame <= 10) {
+                  var punchReach = 25;
+                  var punchX = e.x + (e.vx < 0 ? -punchReach : e.w);
+                  var punchY = e.y + 10;
+                  var punchSize = 10;
+                  
+                  // Check collision with player
+                  if (punchX < p.x + p.w && punchX + punchSize > p.x &&
+                      punchY < p.y + p.h && punchY + punchSize > p.y) {
+                    if (!p.shd && !p.invuln) {
+                      p.hp -= 1;
+                      p.invuln = 30;
+                      // Knockback
+                      var kbDir = Math.sign((p.x + p.w/2) - (e.x + e.w/2));
+                      p.vx = kbDir * 8;
+                      p.vy = -8;
+                    }
+                  }
+                }
+                
+                if (e.attackFrame >= 20) {
+                  e.attacking = 0;
+                  e.attackFrame = 0;
+                }
               }
               
-              // Recalculate path if player is far
-              if (dist > 200) {
-                e._btState = 'CALCULATING_PATH';
-                e._pathRecalcTimer = 0;
-              }
+              // Cooldown tick
+              if (e.attackCooldown > 0) e.attackCooldown--;
+              
+              // Apply physics
+              e.vy = (e.vy || 0) + 0.6;
+              e.y += e.vy;
+              e.x += e.vx;
             }
             
-            if (e._btState === 'IDLE') {
-              // Simple chase as fallback
-              var dx = p.x - e.x;
-              if (Math.abs(dx) > 20) {
-                e.vx = Math.sign(dx) * speed * 0.8;
-              } else {
-                e.vx *= 0.8;
-              }
-            }
-            
-            // Apply physics
-            e.vy = (e.vy || 0) + 0.6;
-            e.y += e.vy;
-            e.x += e.vx;
-
-            // landing detection and reset
+            // Landing detection and reset jumps
             e.gnd = 0;
             for (var j = 0; j < g.plat.length; j++) {
               var pl = g.plat[j];
-              if (e.vy >= 0 && e.x + e.w > pl.x && e.x < pl.x + pl.w && e.y + e.h >= pl.y && e.y + e.h <= pl.y + pl.h + 15) {
-                // check if platform has spikes - hunters fall through
+              if (e.vy >= 0 && e.x + e.w > pl.x && e.x < pl.x + pl.w &&
+                  e.y + e.h >= pl.y && e.y + e.h <= pl.y + pl.h + 15) {
                 if (pl.spikes) {
                   e.dead = 1;
                 } else {
-                  e.y = pl.y - e.h; e.vy = 0; e.gnd = 1; e.jl = 2;
+                  e.y = pl.y - e.h;
+                  e.vy = 0;
+                  e.gnd = 1;
+                  e.jl = e.maxJumps || 2;
                 }
               }
             }
@@ -2192,32 +2758,47 @@
               e.gnd = 1;
             }
             
-            // shooting behavior: fire at player periodically
-            e._shootCooldown--;
-            if (e._shootCooldown <= 0 && Math.abs(dx) < 500) {
-              // calculate angle to player
-              var ex = e.x + e.w / 2;
-              var ey = e.y + e.h / 2;
-              var py = p.y + 20;
-              var angle = Math.atan2(py - ey, (p.x - g.cam + 15) - (ex - g.cam));
-              var arrowSpeed = 8;
-              var vx = Math.cos(angle) * arrowSpeed;
-              var vy = Math.sin(angle) * arrowSpeed;
+            // shooting behavior: draw bow then fire at player periodically
+            if (!e._drawing) {
+              e._shootCooldown--;
+              if (e._shootCooldown <= 0 && Math.abs(dx) < 500) {
+                // start drawing bow
+                e._drawing = true;
+                e._drawProgress = 0;
+                e._drawDuration = 30; // 0.5 seconds to draw
+              }
+            } else {
+              // drawing bow
+              e._drawProgress++;
+              e.vx *= 0.95; // slow down while drawing
               
-              var arrow = {
-                x: ex,
-                y: ey,
-                vx: vx,
-                vy: vy,
-                w: 10,
-                h: 4,
-                life: 100,
-                type: 'enemy_arrow',
-                rot: angle,
-                power: 0.5
-              };
-              g.projectiles.push(arrow);
-              e._shootCooldown = 60 + Math.floor(Math.random() * 40); // shoot every ~1-1.7 seconds
+              if (e._drawProgress >= e._drawDuration) {
+                // release arrow
+                var ex = e.x + e.w / 2;
+                var ey = e.y + e.h / 2;
+                var py = p.y + 20;
+                var angle = Math.atan2(py - ey, (p.x - g.cam + 15) - (ex - g.cam));
+                var arrowSpeed = 8;
+                var vx = Math.cos(angle) * arrowSpeed;
+                var vy = Math.sin(angle) * arrowSpeed;
+                
+                var arrow = {
+                  x: ex,
+                  y: ey,
+                  vx: vx,
+                  vy: vy,
+                  w: 10,
+                  h: 4,
+                  life: 100,
+                  type: 'enemy_arrow',
+                  rot: angle,
+                  power: 0.5
+                };
+                g.projectiles.push(arrow);
+                e._drawing = false;
+                e._drawProgress = 0;
+                e._shootCooldown = 60 + Math.floor(Math.random() * 40); // shoot every ~1-1.7 seconds
+              }
             }
             
             // apply physics
@@ -2237,50 +2818,219 @@
               }
             }
           } else if (e.type === 'spider') {
-            // spider crawls on ceiling and shoots webs
+            // spider crawls on ceiling and can swing or shoot webs
             var speed = e.speed || 1.2;
             
-            // crawl along ceiling (platform above)
-            e.x += e.vx;
-            if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
-            
-            // keep on ceiling (inverted from platform)
-            var plIdx = findPlatformIndexAtX(e.x, e.w);
-            if (plIdx !== -1) {
-              var platform = g.plat[plIdx];
-              e.y = platform.y - platform.h - 60; // stay above platform
-              e.onCeiling = true;
-            }
-            
-            // shoot web at player periodically
-            e._shootCooldown--;
-            if (e._shootCooldown <= 0 && Math.abs(p.x - e.x) < 400) {
-              // calculate trajectory to player
-              var ex = e.x + e.w / 2;
-              var ey = e.y + e.h;
-              var py = p.y + 20;
-              var angle = Math.atan2(py - ey, (p.x + 15) - ex);
-              var webSpeed = 6;
-              var vx = Math.cos(angle) * webSpeed;
-              var vy = Math.sin(angle) * webSpeed;
+            if (!e._swinging) {
+              // track and follow player position
+              var dx = p.x - e.x;
+              if (Math.abs(dx) > 30) {
+                e.vx = Math.sign(dx) * speed;
+              } else {
+                e.vx *= 0.9; // slow down when close
+              }
+              e.x += e.vx;
               
-              var web = {
-                x: ex,
-                y: ey,
-                vx: vx,
-                vy: vy,
-                w: 12,
-                h: 12,
-                life: 150,
-                type: 'web'
-              };
-              g.projectiles.push(web);
-              e._shootCooldown = 90 + Math.floor(Math.random() * 60); // shoot every 1.5-2.5 seconds
+              // keep on ceiling at fixed height above platform
+              var plIdx = findPlatformIndexAtX(e.x, e.w);
+              if (plIdx !== -1) {
+                var platform = g.plat[plIdx];
+                e.y = platform.y - platform.h - 120; // stay high above platform (out of reach)
+                e.onCeiling = true;
+              }
+              
+              // stay within platform bounds (but allow some overhang)
+              if (e.x < e.pl - 20) e.x = e.pl - 20;
+              if (e.x + e.w > e.pr + 20) e.x = e.pr + 20 - e.w;
+              
+              // decide between shooting web or swinging
+              e._shootCooldown--;
+              if (e._shootCooldown <= 0 && Math.abs(p.x - e.x) < 400) {
+                var ex = e.x + e.w / 2;
+                var ey = e.y + e.h;
+                
+                // alternate between shoot and swing attacks
+                if (e._attackMode === 'shoot') {
+                  // shoot web projectile at player
+                  var py = p.y + 20;
+                  var angle = Math.atan2(py - ey, (p.x + 15) - ex);
+                  var webSpeed = 6;
+                  var vx = Math.cos(angle) * webSpeed;
+                  var vy = Math.sin(angle) * webSpeed;
+                  
+                  var web = {
+                    x: ex,
+                    y: ey,
+                    vx: vx,
+                    vy: vy,
+                    w: 12,
+                    h: 12,
+                    life: 150,
+                    type: 'web'
+                  };
+                  g.projectiles.push(web);
+                  e._attackMode = 'swing'; // next attack will be swing
+                  e._shootCooldown = 90 + Math.floor(Math.random() * 60);
+                } else {
+                  // start swing attack if player is below and in range
+                  if (p.y > e.y && Math.abs(p.x - e.x) < 300) {
+                    // calculate distance to player to determine web length
+                    var distX = (p.x + p.w / 2) - ex;
+                    var distY = (p.y + p.h / 2) - ey;
+                    var distToPlayer = Math.sqrt(distX * distX + distY * distY);
+                    
+                    // set web length to reach player (with some extra swing range)
+                    e._swingLen = Math.max(100, distToPlayer * 0.9); // at least 100, usually 90% of distance
+                    
+                    e._swinging = true;
+                    e._swingTimer = 90; // swing duration (1.5 seconds)
+                    e._anchorX = ex;
+                    e._anchorY = ey - 40; // anchor point above spider
+                    e._swingAngle = -Math.PI / 6; // start angle (slightly left)
+                    e._swingSpeed = 0.08; // initial swing speed
+                    e.vx = 0; // stop crawling
+                  }
+                  e._attackMode = 'shoot'; // next attack will be shoot
+                  e._shootCooldown = 60 + Math.floor(Math.random() * 40);
+                }
+              }
+            } else {
+              // swinging attack
+              e._swingTimer--;
+              
+              // pendulum physics
+              var gravity = 0.003;
+              var damping = 0.995;
+              e._swingSpeed += Math.sin(e._swingAngle) * gravity;
+              e._swingSpeed *= damping;
+              e._swingAngle += e._swingSpeed;
+              
+              // calculate spider position on swing using dynamic web length
+              var swingLen = e._swingLen || 80;
+              e.x = e._anchorX + Math.sin(e._swingAngle) * swingLen - e.w / 2;
+              e.y = e._anchorY + Math.cos(e._swingAngle) * swingLen;
+              
+              // check collision with player during swing
+              if (p.inv <= 0 && coll({x: e.x, y: e.y, w: e.w, h: e.h},
+                {x: p.x + 5, y: p.y + 5, w: p.w - 10, h: p.h - 5})) {
+                // hit player - apply knockback only (no damage)
+                p.inv = 30; // short invincibility to prevent multiple knockbacks
+                
+                // apply knockback in direction of swing
+                var knockbackX = Math.sin(e._swingAngle) * 15;
+                var knockbackY = -8;
+                p.vx = knockbackX;
+                p.vy = knockbackY;
+                p.gnd = 0;
+              }
+              
+              // end swing
+              if (e._swingTimer <= 0) {
+                e._swinging = false;
+                // return to ceiling
+                var plIdx = findPlatformIndexAtX(e.x, e.w);
+                if (plIdx !== -1) {
+                  var platform = g.plat[plIdx];
+                  e.y = platform.y - platform.h - 120;
+                  e.onCeiling = true;
+                }
+              }
             }
           } else {
-            // simple patrol behavior
-            e.x += e.vx;
-            if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
+            // normal enemy behavior - patrol and attack
+            var dx = p.x - e.x;
+            var dist = Math.abs(dx);
+            
+            // attack logic when close to player
+            if (dist < 35 && Math.abs(p.y - e.y) < 50 && !e.attacking && e.attackCooldown <= 0) {
+              e.attacking = 1;
+              e.attackFrame = 0;
+              e.attackCooldown = 60; // cooldown after attack
+            }
+            
+            if (e.attacking) {
+              e.attackFrame++;
+              // continue moving toward player during attack (slower)
+              if (dist > 25) {
+                e.vx = Math.sign(dx) * 1.5;
+                e.x += e.vx;
+              } else {
+                e.vx *= 0.7; // slow down when very close
+              }
+              
+              // calculate weapon hitbox based on weapon type and attack frame
+              var sd = dx > 0 ? 1 : -1; // face direction based on player position
+              var cx = e.x + e.w / 2;
+              var cy = e.y;
+              var weaponHitbox = null;
+              
+              if (e.weaponTier === 0) {
+                // unarmed punch hitbox
+                var progress = e.attackFrame / 15;
+                var attackAngle = Math.sin(progress * Math.PI) * Math.PI / 3;
+                var armLen = 12;
+                var fistX = cx + Math.cos(attackAngle) * armLen * sd;
+                var fistY = cy + 22 + Math.sin(attackAngle) * armLen;
+                weaponHitbox = {x: fistX - 5, y: fistY - 5, w: 10, h: 10};
+              } else if (e.weaponTier === 1) {
+                // knife jab hitbox (forward thrust)
+                var progress = e.attackFrame / 15;
+                var thrust = progress < 0.5 ? progress * 2 : (1 - (progress - 0.5) * 2); // 0 to 1 to 0
+                var extendDist = thrust * 10; // matches visual
+                var armReach = 8 + extendDist;
+                var bladeLen = 15; // increased blade length
+                var totalReach = armReach + bladeLen;
+                var knifeX = cx + totalReach * sd;
+                var knifeY = cy + 22;
+                weaponHitbox = {x: knifeX - 8, y: knifeY - 8, w: 16, h: 16};
+              } else if (e.weaponTier === 2) {
+                // sword swing hitbox
+                var attackAngle = (e.attackFrame / 15) * Math.PI - Math.PI / 4;
+                var armLen = 12;
+                var armX = cx + Math.cos(attackAngle) * armLen * sd;
+                var armY = cy + 25 + Math.sin(attackAngle) * armLen;
+                var swordLen = 28;
+                var swordX = armX + Math.cos(attackAngle) * swordLen * sd;
+                var swordY = armY + Math.sin(attackAngle) * swordLen;
+                // sword hitbox as a rectangle along the blade
+                var minX = Math.min(armX, swordX) - 5;
+                var maxX = Math.max(armX, swordX) + 5;
+                var minY = Math.min(armY, swordY) - 5;
+                var maxY = Math.max(armY, swordY) + 5;
+                weaponHitbox = {x: minX, y: minY, w: maxX - minX, h: maxY - minY};
+              }
+              
+              // check weapon hitbox collision with player
+              if (weaponHitbox && p.inv <= 0 && e.attackFrame >= 5 && e.attackFrame <= 12) {
+                if (coll(weaponHitbox, {x: p.x + 5, y: p.y + 5, w: p.w - 10, h: p.h - 5})) {
+                  var damage = e.weaponTier === 2 ? 2 : 1;
+                  p.hp -= damage;
+                  p.inv = 90;
+                  upHp();
+                  damageSound();
+                  if (p.hp <= 0) endGame();
+                }
+              }
+              
+              if (e.attackFrame >= 15) {
+                e.attacking = 0;
+                e.attackFrame = 0;
+              }
+            } else {
+              // patrol and chase behavior
+              if (dist < 150 && Math.abs(p.y - e.y) < 80) {
+                // chase player when in range
+                e.vx = Math.sign(dx) * 2;
+                e.x += e.vx;
+              } else {
+                // normal patrol
+                e.x += e.vx;
+                if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
+              }
+            }
+            
+            if (e.attackCooldown > 0) e.attackCooldown--;
+            
             // ensure y aligned to platform if possible
             var plIdx = findPlatformIndexAtX(e.x, e.w);
             if (plIdx !== -1) {
@@ -2311,8 +3061,8 @@
             g.spawnMul = 1.5;
             g.hunters.push(e);
           }
-          // collision damage
-          if (!e.dead && p.inv <= 0 && coll({
+          // collision damage (exclude spiders - they only damage via web projectile)
+          if (!e.dead && e.type !== 'spider' && p.inv <= 0 && coll({
               x: p.x + 5,
               y: p.y + 5,
               w: p.w - 10,
@@ -2504,6 +3254,36 @@
         for (var i = 0; i < g.plat.length; i++) drawPlat(g.plat[i], g.cam);
         for (var i = 0; i < g.coinItems.length; i++) drawCoin(g.coinItems[i], t, g.cam);
         for (var i = 0; i < g.obs.length; i++) drawObs(g.obs[i], g.cam);
+        // draw spider web strands for swinging spiders (before enemies so strands appear behind)
+        for (var i = 0; i < g.en.length; i++) {
+          var e = g.en[i];
+          if (e.type === 'spider' && e._swinging && !e.dead) {
+            var sx = e._anchorX - g.cam;
+            var sy = e._anchorY;
+            var ex = e.x + e.w / 2 - g.cam;
+            var ey = e.y + 10;
+            
+            ctx.save();
+            ctx.strokeStyle = 'rgba(209, 213, 219, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+            ctx.shadowBlur = 4;
+            
+            // draw web strand
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(ex, ey);
+            ctx.stroke();
+            
+            // draw anchor point
+            ctx.fillStyle = '#9ca3af';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+          }
+        }
         for (var i = 0; i < g.en.length; i++) drawEn(g.en[i], g.cam);
         // draw powerups
         for (var i = 0; i < g.powerups.length; i++) {
