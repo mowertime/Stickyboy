@@ -431,7 +431,14 @@
         gap: 12px;
         margin-top: 24px;
         flex-wrap: wrap;
-        justify-content: center
+        justify-content: center;
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        width: 100%;
+        max-width: 500px;
       }
 
       @media(min-width:769px) {
@@ -474,28 +481,40 @@
       }
 
       .control-btn {
-        width: 56px;
-        height: 56px;
+        width: 70px;
+        height: 70px;
         border-radius: 50%;
-        background: rgba(30, 41, 59, 0.8);
-        border: 2px solid rgba(34, 211, 238, 0.5);
+        background: rgba(30, 41, 59, 0.9);
+        border: 3px solid rgba(34, 211, 238, 0.6);
         color: #22d3ee;
-        font-size: 20px;
-        padding: 0
+        font-size: 24px;
+        padding: 0;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .control-btn:active {
+        background: rgba(34, 211, 238, 0.3);
+        transform: scale(0.95);
       }
 
       .jump {
-        width: 64px;
-        border-color: rgba(251, 191, 36, 0.5);
+        width: 80px;
+        height: 80px;
+        border-color: rgba(251, 191, 36, 0.6);
         color: #fbbf24;
-        font-size: 14px
+        font-size: 16px;
+        font-weight: bold;
       }
 
       .attack {
-        width: 64px;
-        border-color: rgba(59, 130, 246, 0.5);
+        width: 80px;
+        height: 80px;
+        border-color: rgba(59, 130, 246, 0.6);
         color: #3b82f6;
-        font-size: 24px
+        font-size: 28px;
       }
 
       .heart {
@@ -515,7 +534,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        z-index: 9999;
+        z-index: 10001;
         color: #fff;
         text-align: center;
         padding: 20px;
