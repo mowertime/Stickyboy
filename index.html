@@ -91,6 +91,15 @@
         font-size: 14px
       }
 
+      #deviceInfo {
+        background: rgba(30, 41, 59, 0.9);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        color: #94a3b8;
+        font-weight: normal;
+      }
+
       #healthStat {
         flex-direction: row;
         align-items: center
@@ -518,6 +527,7 @@
       <div id="hudTopRight">
         <button class="settingsBtn" onclick="goToUpgrades()">🛠 UPGRADES</button>
         <button class="settingsBtn" onclick="toggleFullscreen()" id="fullscreenBtn">⛶</button>
+        <div id="deviceInfo" style="font-size:11px;color:#94a3b8;padding:4px 8px;"></div>
       </div>
       <div id="canvasWrapper">
         <canvas id="gameCanvas"></canvas>
@@ -885,7 +895,7 @@
       }
       
       // A* pathfinding for platform navigation (Minecraft-style)
-      function findPlatformPathAStar(startIdx, goalIdx, platforms) {
+      function findPlatformPathAStar(startIdx, goalIdx, platforms, canUseSpikes) {
         if (startIdx === -1 || goalIdx === -1 || startIdx === goalIdx) return null;
         if (!platforms[startIdx] || !platforms[goalIdx]) return null;
         
@@ -905,7 +915,7 @@
             if (x >= plat.x && x <= plat.x + plat.w) {
               // Check if platform is below but within safe fall distance
               if (plat.y > y && plat.y - y < maxFallDist) {
-                return !plat.spikes; // platform exists and is safe (no spikes)
+                return !plat.spikes || canUseSpikes; // platform exists and is safe (no spikes unless immune)
               }
             }
           }
@@ -917,8 +927,8 @@
           var from = platforms[fromIdx], to = platforms[toIdx];
           if (!from || !to) return false; // invalid platforms (value 0)
           
-          // Don't jump to spike platforms
-          if (to.spikes) return false; // unsafe platform (value 0)
+          // Don't jump to spike platforms unless immune
+          if (to.spikes && !canUseSpikes) return false; // unsafe platform (value 0)
           
           // Calculate gap and height difference
           var gap = to.x > from.x ? 
@@ -1140,8 +1150,8 @@
           _shootCooldown: 0
         };
         if (type === 'hunter') {
-          en.hp = 3;
-          en.speed = 2.5;
+          en.hp = 5; // Most durable enemy
+          en.speed = 3.5; // Fastest enemy
           en.jl = 2;
           en.maxJumps = 2;
           en._platformPath = null;
@@ -1150,6 +1160,7 @@
           en._targetPlatform = null;
           en._stuckTimer = 0;
           en._lastX = 0;
+          en.damage = 2; // Double damage
           // Spawn hunters directly on platform to prevent falling
           en.y = p.y - en.h;
           en.gnd = 1;
@@ -2579,7 +2590,28 @@
             
             // Don't move if not on a valid platform (prevents void walking)
             if (currentPlatIdx === -1) {
-              e.vx = 0;
+              // In the air - check if double jump is needed to reach player or platform
+              if (!e.gnd && e.jl > 0) {
+                var needsDoubleJump = false;
+                
+                // Double jump if falling and player is above
+                if (e.vy > 0 && p.y < e.y - 50) {
+                  needsDoubleJump = true;
+                }
+                
+                // Double jump if not going to make it to next platform
+                if (e.vy > 2 && Math.abs((p.x + p.w/2) - (e.x + e.w/2)) < 200) {
+                  needsDoubleJump = true;
+                }
+                
+                // Execute double jump toward player
+                if (needsDoubleJump) {
+                  e.vy = -14;
+                  e.vx = playerDir * speed * 1.5; // Boost toward player
+                  e.jl--;
+                }
+              }
+              
               e.vy = (e.vy || 0) + 0.6;
               e.y += e.vy;
               e.x += e.vx;
@@ -2595,15 +2627,44 @@
               // Recalculate path periodically or when stuck
               e._recalcTimer = (e._recalcTimer || 0) - 1;
               if (e._recalcTimer <= 0 || e._stuckTimer > 30 || !e._platformPath) {
-                e._platformPath = findPlatformPathAStar(currentPlatIdx, targetPlatIdx, g.plat);
+                e._platformPath = findPlatformPathAStar(currentPlatIdx, targetPlatIdx, g.plat, true); // hunters can use spikes
                 e._pathIndex = 0;
                 e._recalcTimer = 45; // recalc every 0.75 seconds
                 e._stuckTimer = 0;
               }
             
-              // Check distance to player for attack
+              // Check distance to player for attack and pursuit
               var distToPlayer = Math.abs((p.x + p.w/2) - (e.x + e.w/2));
               var vertDistToPlayer = Math.abs(p.y - e.y);
+              var playerDir = Math.sign((p.x + p.w/2) - (e.x + e.w/2));
+              
+              // Relentless jumping toward player - no distance limit
+              if (!e.attacking && e.gnd && e.jl > 0) {
+                var shouldAggressiveJump = false;
+                
+                // Jump toward player if they're above
+                if (p.y < e.y - 40) {
+                  shouldAggressiveJump = true;
+                }
+                
+                // Jump toward player if on same level but at distance
+                if (Math.abs(p.y - e.y) < 60 && distToPlayer > 60 && distToPlayer < 300) {
+                  shouldAggressiveJump = true;
+                }
+                
+                // Jump over any obstacle in the way
+                if (distToPlayer < 400 && e._stuckTimer > 10) {
+                  shouldAggressiveJump = true;
+                }
+                
+                // Perform aggressive jump with momentum
+                if (shouldAggressiveJump) {
+                  e.vy = -14; // Higher jump
+                  e.vx = playerDir * speed * 1.5; // Extra speed toward player
+                  e.gnd = 0;
+                  e.jl--;
+                }
+              }
               
               // Attack if close enough (hunters use unarmed attacks)
               if (distToPlayer < 40 && vertDistToPlayer < 50 && e.attackCooldown <= 0) {
@@ -2619,49 +2680,71 @@
                 var nextPlat = g.plat[nextPlatIdx];
                 var currentPlat = g.plat[currentPlatIdx];
                 
-                if (nextPlat) {
+                if (nextPlat && currentPlat) {
                   var targetX = nextPlat.x + nextPlat.w / 2;
                   var dx = targetX - (e.x + e.w / 2);
                   var dist = Math.abs(dx);
                   
                   // Check if we need to jump to reach next platform
                   var needsJump = false;
-                  if (currentPlat && nextPlat) {
-                    var gap = nextPlat.x > currentPlat.x ?
-                      (nextPlat.x - (currentPlat.x + currentPlat.w)) :
-                      (currentPlat.x - (nextPlat.x + nextPlat.w));
-                    var heightDiff = currentPlat.y - nextPlat.y;
-                    
-                    // Jump if there's a gap or platform is higher
-                    needsJump = gap > 10 || heightDiff > 5;
+                  var gap = 0;
+                  var heightDiff = currentPlat.y - nextPlat.y;
+                  
+                  if (nextPlat.x > currentPlat.x + currentPlat.w) {
+                    // Gap to the right
+                    gap = nextPlat.x - (currentPlat.x + currentPlat.w);
+                  } else if (currentPlat.x > nextPlat.x + nextPlat.w) {
+                    // Gap to the left
+                    gap = currentPlat.x - (nextPlat.x + nextPlat.w);
                   }
                   
-                  // Safety check: don't walk off platform edge without jumping
-                  var platformEdgeLeft = currentPlat.x;
-                  var platformEdgeRight = currentPlat.x + currentPlat.w;
-                  var willWalkOff = false;
-                  if (dx > 0) { // moving right
-                    willWalkOff = (e.x + e.w + speed * 2) > platformEdgeRight && !needsJump;
-                  } else if (dx < 0) { // moving left
-                    willWalkOff = (e.x - speed * 2) < platformEdgeLeft && !needsJump;
-                  }
+                  // Jump if there's a gap or platform is higher
+                  needsJump = gap > 5 || heightDiff > 10;
                   
-                  // Move toward target only if safe
-                  if (!willWalkOff) {
-                    if (dist > 20) {
-                      e.vx = Math.sign(dx) * speed;
-                    } else {
-                      e.vx = Math.sign(dx) * speed * 0.5;
-                    }
+                  // Always move toward target at maximum speed
+                  if (dist > 20) {
+                    e.vx = Math.sign(dx) * speed * 1.4; // maximum aggressive speed
                   } else {
-                    e.vx = 0; // stop at edge
+                    e.vx = Math.sign(dx) * speed * 1.2;
                   }
                   
                   // Execute jump when needed and on ground
                   if (needsJump && e.gnd && e.jl > 0) {
-                    e.vy = -13;
-                    e.gnd = 0;
-                    e.jl--;
+                    // Check if we're close enough to the edge to jump
+                    var atEdge = false;
+                    if (dx > 0) { // need to go right
+                      atEdge = (e.x + e.w) >= (currentPlat.x + currentPlat.w - 15);
+                    } else { // need to go left
+                      atEdge = e.x <= (currentPlat.x + 15);
+                    }
+                    
+                    if (atEdge) {
+                      e.vy = -14; // Initial jump
+                      e.gnd = 0;
+                      e.jl--;
+                    }
+                  }
+                  
+                  // Mid-air double jump if needed (failing to reach platform)
+                  if (!e.gnd && e.jl > 0 && e.vy > -2 && needsJump) {
+                    // Check if we're going to miss the platform
+                    var willMiss = false;
+                    if (dx > 0 && e.vx < speed * 0.5) { // not moving fast enough right
+                      willMiss = true;
+                    } else if (dx < 0 && e.vx > -speed * 0.5) { // not moving fast enough left
+                      willMiss = true;
+                    }
+                    
+                    // Or if falling and still far from target
+                    if (e.vy > 3 && dist > 40) {
+                      willMiss = true;
+                    }
+                    
+                    if (willMiss) {
+                      e.vy = -14;
+                      e.vx = Math.sign(dx) * speed * 1.5; // Boost toward target
+                      e.jl--;
+                    }
                   }
                   
                   // Advance to next waypoint when close
@@ -2674,14 +2757,27 @@
                   }
                 }
               } else if (!e.attacking) {
-                // No path found - try direct approach if close
+                // No path found - NEVER give up, chase across entire map
                 var dx = p.x - e.x;
-                if (distToPlayer < 150 && vertDistToPlayer < 50) {
-                  if (Math.abs(dx) > 20) {
-                    e.vx = Math.sign(dx) * speed * 0.5;
+                // Always chase player no matter the distance
+                e.vx = Math.sign(dx) * speed * 1.3; // Fast pursuit
+                
+                // Jump if player is higher or far away
+                if (e.gnd && e.jl > 0) {
+                  if (p.y < e.y - 30 || (vertDistToPlayer < 80 && distToPlayer > 100)) {
+                    e.vy = -14; // Higher jump
+                    e.gnd = 0;
+                    e.jl--;
                   }
-                } else {
-                  e.vx = 0;
+                }
+                
+                // Mid-air double jump to reach player
+                if (!e.gnd && e.jl > 0 && e.vy > -3) {
+                  if (p.y < e.y - 30 || (e.vy > 2 && distToPlayer < 200)) {
+                    e.vy = -14;
+                    e.vx = Math.sign(dx) * speed * 1.5;
+                    e.jl--;
+                  }
                 }
               }
               
@@ -2690,23 +2786,23 @@
                 e.attackFrame++;
                 e.vx = 0; // don't move during attack
                 
-                // Unarmed punch hitbox (frame 5-10)
+                // Powerful hunter attack hitbox (frame 5-10)
                 if (e.attackFrame >= 5 && e.attackFrame <= 10) {
-                  var punchReach = 25;
+                  var punchReach = 30; // Longer reach
                   var punchX = e.x + (e.vx < 0 ? -punchReach : e.w);
                   var punchY = e.y + 10;
-                  var punchSize = 10;
+                  var punchSize = 15; // Larger hitbox
                   
                   // Check collision with player
                   if (punchX < p.x + p.w && punchX + punchSize > p.x &&
                       punchY < p.y + p.h && punchY + punchSize > p.y) {
                     if (!p.shd && !p.invuln) {
-                      p.hp -= 1;
+                      p.hp -= (e.damage || 2); // 2 damage - most powerful
                       p.invuln = 30;
-                      // Knockback
+                      // Stronger knockback
                       var kbDir = Math.sign((p.x + p.w/2) - (e.x + e.w/2));
-                      p.vx = kbDir * 8;
-                      p.vy = -8;
+                      p.vx = kbDir * 12; // Increased knockback
+                      p.vy = -10;
                     }
                   }
                 }
@@ -2732,7 +2828,8 @@
               var pl = g.plat[j];
               if (e.vy >= 0 && e.x + e.w > pl.x && e.x < pl.x + pl.w &&
                   e.y + e.h >= pl.y && e.y + e.h <= pl.y + pl.h + 15) {
-                if (pl.spikes) {
+                // Hunters are immune to spikes - they can walk on them
+                if (pl.spikes && e.type !== 'hunter') {
                   e.dead = 1;
                 } else {
                   e.y = pl.y - e.h;
@@ -3518,39 +3615,156 @@
         }
       }
       
-      // Keyboard detection for mobile controls
-      var hasPhysicalKeyboard = false;
+      // ==============================================
+      // COMPREHENSIVE DEVICE DETECTION SYSTEM
+      // ==============================================
+      
+      var deviceInfo = {
+        type: 'unknown',        // desktop, mobile, tablet
+        os: 'unknown',          // windows, mac, linux, ios, android
+        browser: 'unknown',     // chrome, firefox, safari, edge
+        touchCapable: false,
+        hasPhysicalKeyboard: false,
+        screenSize: 'unknown',
+        pixelRatio: 1
+      };
+      
       var keyboardCheckTimeout = null;
+      
+      // Detect device type and capabilities
+      function detectDevice() {
+        var ua = navigator.userAgent;
+        var platform = navigator.platform || '';
+        
+        // Detect touch capability
+        deviceInfo.touchCapable = (
+          'ontouchstart' in window ||
+          navigator.maxTouchPoints > 0 ||
+          navigator.msMaxTouchPoints > 0
+        );
+        
+        // Detect Operating System
+        if (/iPhone|iPad|iPod/.test(ua)) {
+          deviceInfo.os = 'iOS';
+        } else if (/Android/.test(ua)) {
+          deviceInfo.os = 'Android';
+        } else if (/Mac/.test(platform)) {
+          deviceInfo.os = 'macOS';
+        } else if (/Win/.test(platform)) {
+          deviceInfo.os = 'Windows';
+        } else if (/Linux/.test(platform)) {
+          deviceInfo.os = 'Linux';
+        }
+        
+        // Detect Browser
+        if (/Edg/.test(ua)) {
+          deviceInfo.browser = 'Edge';
+        } else if (/Chrome/.test(ua) && !/Edg/.test(ua)) {
+          deviceInfo.browser = 'Chrome';
+        } else if (/Safari/.test(ua) && !/Chrome/.test(ua)) {
+          deviceInfo.browser = 'Safari';
+        } else if (/Firefox/.test(ua)) {
+          deviceInfo.browser = 'Firefox';
+        }
+        
+        // Detect Device Type
+        var isMobile = /Mobile|Android|iPhone/.test(ua);
+        var isTablet = /iPad|Android/.test(ua) && !/Mobile/.test(ua);
+        
+        // More reliable mobile/tablet detection
+        if (isTablet || (deviceInfo.touchCapable && window.innerWidth >= 768 && window.innerWidth <= 1024)) {
+          deviceInfo.type = 'tablet';
+        } else if (isMobile || (deviceInfo.touchCapable && window.innerWidth < 768)) {
+          deviceInfo.type = 'mobile';
+        } else {
+          deviceInfo.type = 'desktop';
+        }
+        
+        // Screen size classification
+        var width = window.innerWidth;
+        if (width < 480) {
+          deviceInfo.screenSize = 'small';
+        } else if (width < 768) {
+          deviceInfo.screenSize = 'medium';
+        } else if (width < 1200) {
+          deviceInfo.screenSize = 'large';
+        } else {
+          deviceInfo.screenSize = 'xlarge';
+        }
+        
+        deviceInfo.pixelRatio = window.devicePixelRatio || 1;
+        
+        // Log device info for debugging
+        console.log('Device Detected:', deviceInfo);
+        
+        // Update display
+        updateDeviceDisplay();
+        checkForPhysicalKeyboard();
+      }
+      
+      // Update the device info display in the HUD
+      function updateDeviceDisplay() {
+        var display = document.getElementById('deviceInfo');
+        if (display) {
+          var icon = deviceInfo.type === 'mobile' ? '📱' : 
+                     deviceInfo.type === 'tablet' ? '📱' : '💻';
+          var keyboard = deviceInfo.hasPhysicalKeyboard ? '⌨️' : '';
+          var touch = deviceInfo.touchCapable ? '👆' : '';
+          
+          display.textContent = icon + ' ' + 
+                                deviceInfo.type.charAt(0).toUpperCase() + deviceInfo.type.slice(1) + 
+                                ' | ' + deviceInfo.os + ' | ' + 
+                                deviceInfo.browser + ' ' + keyboard + touch;
+          display.title = 'Device: ' + deviceInfo.type + '\n' +
+                         'OS: ' + deviceInfo.os + '\n' +
+                         'Browser: ' + deviceInfo.browser + '\n' +
+                         'Screen: ' + deviceInfo.screenSize + ' (' + window.innerWidth + 'x' + window.innerHeight + ')\n' +
+                         'Touch: ' + (deviceInfo.touchCapable ? 'Yes' : 'No') + '\n' +
+                         'Keyboard: ' + (deviceInfo.hasPhysicalKeyboard ? 'Yes' : 'No') + '\n' +
+                         'Pixel Ratio: ' + deviceInfo.pixelRatio;
+        }
+      }
       
       function checkForPhysicalKeyboard() {
         // Check if device has a physical keyboard by detecting keyboard events
         var controls = document.querySelector('.controls');
         
+        // Desktop devices always have keyboard
+        if (deviceInfo.type === 'desktop') {
+          deviceInfo.hasPhysicalKeyboard = true;
+        }
+        
         // On mobile/tablet without keyboard, controls show via CSS media query
         // If we detect keyboard input, hide them
-        if (hasPhysicalKeyboard && controls) {
+        if (deviceInfo.hasPhysicalKeyboard && controls) {
           controls.style.display = 'none';
-        } else if (controls && window.innerWidth <= 768) {
-          // Only show if mobile size and no keyboard detected
-          if (!hasPhysicalKeyboard) {
+        } else if (controls && (deviceInfo.type === 'mobile' || deviceInfo.type === 'tablet' || window.innerWidth <= 768)) {
+          // Only show if mobile/tablet size and no keyboard detected
+          if (!deviceInfo.hasPhysicalKeyboard) {
             controls.style.display = 'flex';
           }
         }
+        
+        updateDeviceDisplay();
       }
       
       // Detect physical keyboard by monitoring for actual key presses
       function onKeyboardDetected() {
-        if (!hasPhysicalKeyboard) {
-          hasPhysicalKeyboard = true;
+        if (!deviceInfo.hasPhysicalKeyboard) {
+          deviceInfo.hasPhysicalKeyboard = true;
           checkForPhysicalKeyboard();
+          console.log('Physical keyboard detected!');
         }
         
-        // Reset the flag after 30 seconds of no keyboard activity
-        clearTimeout(keyboardCheckTimeout);
-        keyboardCheckTimeout = setTimeout(function() {
-          hasPhysicalKeyboard = false;
-          checkForPhysicalKeyboard();
-        }, 30000);
+        // Reset the flag after 30 seconds of no keyboard activity (only on mobile/tablet)
+        if (deviceInfo.type !== 'desktop') {
+          clearTimeout(keyboardCheckTimeout);
+          keyboardCheckTimeout = setTimeout(function() {
+            deviceInfo.hasPhysicalKeyboard = false;
+            checkForPhysicalKeyboard();
+            console.log('Physical keyboard disconnected');
+          }, 30000);
+        }
       }
       
       // Listen for keyboard events to detect physical keyboard
@@ -3562,11 +3776,21 @@
         }
       });
       
-      // Check on window resize
-      window.addEventListener('resize', checkForPhysicalKeyboard);
+      // Detect device on load and on window resize
+      detectDevice();
       
-      // Initial check
-      setTimeout(checkForPhysicalKeyboard, 100);
+      window.addEventListener('resize', function() {
+        detectDevice();
+      });
+      
+      // Also update device detection periodically (for when tablets dock/undock keyboards)
+      setInterval(function() {
+        var oldType = deviceInfo.type;
+        detectDevice();
+        if (oldType !== deviceInfo.type) {
+          console.log('Device type changed from', oldType, 'to', deviceInfo.type);
+        }
+      }, 5000);
       
       // Listen for fullscreen changes
       document.addEventListener('fullscreenchange', updateFullscreenButton);
