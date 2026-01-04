@@ -499,6 +499,51 @@
       .empty {
         opacity: 0.3
       }
+
+      /* Rotation prompt for mobile devices in portrait mode */
+      #rotatePrompt {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.98);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        color: #fff;
+        text-align: center;
+        padding: 20px;
+      }
+
+      #rotatePrompt.show {
+        display: flex;
+      }
+
+      .rotate-icon {
+        font-size: 80px;
+        margin-bottom: 20px;
+        animation: rotate-anim 2s ease-in-out infinite;
+      }
+
+      @keyframes rotate-anim {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(90deg); }
+      }
+
+      .rotate-text {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 10px;
+        background: linear-gradient(to right, #22d3ee, #3b82f6);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .rotate-subtext {
+        font-size: 16px;
+        color: #94a3b8;
+      }
     </style>
   </head>
   <body>
@@ -668,6 +713,11 @@
       <button class="control-btn jump" onmousedown="key('up',1)" onmouseup="key('up',0)" ontouchstart="key('up',1)" ontouchend="key('up',0)">JUMP</button>
       <button class="control-btn attack" onmousedown="key('swing',1)" onmouseup="key('swing',0)" ontouchstart="key('swing',1)" ontouchend="key('swing',0)">⚔️</button>
       <button class="control-btn" onmousedown="key('right',1)" onmouseup="key('right',0)" ontouchstart="key('right',1)" ontouchend="key('right',0)">→</button>
+    </div>
+    <div id="rotatePrompt">
+      <div class="rotate-icon">📱</div>
+      <div class="rotate-text">Please Rotate Your Device</div>
+      <div class="rotate-subtext">Turn your device to landscape mode for the best experience</div>
     </div>
     <p style="color:#64748b;font-size:10px;margin:0;padding:2px 0">← → or A/D to move • ↑ or W or SPACE to jump • SHIFT to attack</p>
     <div id="errorLog" style="display:none;position:fixed;bottom:10px;right:10px;background:rgba(239,68,68,0.95);color:#fff;padding:12px 16px;border-radius:8px;max-width:400px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:11px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
@@ -3734,14 +3784,20 @@
           deviceInfo.hasPhysicalKeyboard = true;
         }
         
-        // On mobile/tablet without keyboard, controls show via CSS media query
-        // If we detect keyboard input, hide them
-        if (deviceInfo.hasPhysicalKeyboard && controls) {
-          controls.style.display = 'none';
-        } else if (controls && (deviceInfo.type === 'mobile' || deviceInfo.type === 'tablet' || window.innerWidth <= 768)) {
-          // Only show if mobile/tablet size and no keyboard detected
-          if (!deviceInfo.hasPhysicalKeyboard) {
+        // Update controls visibility based on device and keyboard
+        if (controls) {
+          if (deviceInfo.hasPhysicalKeyboard) {
+            // Has keyboard - hide touch controls
+            controls.style.display = 'none';
+          } else if (deviceInfo.type === 'mobile' || deviceInfo.type === 'tablet') {
+            // Mobile/tablet without keyboard - always show controls
             controls.style.display = 'flex';
+          } else if (window.innerWidth <= 768) {
+            // Small screen without keyboard - show controls
+            controls.style.display = 'flex';
+          } else {
+            // Desktop size, assume keyboard exists
+            controls.style.display = 'none';
           }
         }
         
@@ -3776,11 +3832,55 @@
         }
       });
       
+      // Orientation and rotation prompt management
+      function checkOrientation() {
+        var rotatePrompt = document.getElementById('rotatePrompt');
+        if (!rotatePrompt) return;
+        
+        // Only show rotation prompt on mobile/tablet devices
+        if (deviceInfo.type === 'mobile' || deviceInfo.type === 'tablet') {
+          var isPortrait = window.innerHeight > window.innerWidth;
+          var isLandscape = window.innerWidth > window.innerHeight;
+          
+          if (isPortrait) {
+            // Show rotation prompt in portrait mode
+            rotatePrompt.classList.add('show');
+          } else {
+            // Hide prompt in landscape mode
+            rotatePrompt.classList.remove('show');
+            
+            // Auto-fullscreen when rotated to landscape (if not already in fullscreen)
+            if (isLandscape && !document.fullscreenElement && 
+                !document.webkitFullscreenElement && 
+                !document.mozFullScreenElement && 
+                !document.msFullscreenElement) {
+              // Small delay to ensure rotation is complete
+              setTimeout(function() {
+                toggleFullscreen();
+              }, 300);
+            }
+          }
+        } else {
+          // Desktop - never show rotation prompt
+          rotatePrompt.classList.remove('show');
+        }
+      }
+      
       // Detect device on load and on window resize
       detectDevice();
+      checkOrientation();
       
       window.addEventListener('resize', function() {
         detectDevice();
+        checkOrientation();
+      });
+      
+      // Listen for orientation changes (mobile devices)
+      window.addEventListener('orientationchange', function() {
+        setTimeout(function() {
+          detectDevice();
+          checkOrientation();
+        }, 100);
       });
       
       // Also update device detection periodically (for when tablets dock/undock keyboards)
