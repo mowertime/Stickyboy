@@ -427,11 +427,17 @@
       }
 
       .controls {
-        display: none;
+        display: flex;
         gap: 12px;
         margin-top: 24px;
         flex-wrap: wrap;
         justify-content: center
+      }
+
+      @media(min-width:769px) {
+        .controls {
+          display: none
+        }
       }
 
       @media(max-width:768px) {
@@ -515,8 +521,33 @@
         padding: 20px;
       }
 
+      /* Show rotation prompt on small screens in portrait by default */
+      @media(max-width:768px) and (orientation: portrait) {
+        #rotatePrompt {
+          display: flex;
+        }
+      }
+
+      /* Hide in landscape */
+      @media(max-width:768px) and (orientation: landscape) {
+        #rotatePrompt {
+          display: none;
+        }
+      }
+
+      /* Desktop - never show */
+      @media(min-width:769px) {
+        #rotatePrompt {
+          display: none !important;
+        }
+      }
+
       #rotatePrompt.show {
         display: flex;
+      }
+
+      #rotatePrompt.hide {
+        display: none !important;
       }
 
       .rotate-icon {
@@ -3776,28 +3807,18 @@
       }
       
       function checkForPhysicalKeyboard() {
-        // Check if device has a physical keyboard by detecting keyboard events
         var controls = document.querySelector('.controls');
         
         // Desktop devices always have keyboard
-        if (deviceInfo.type === 'desktop') {
+        if (deviceInfo.type === 'desktop' || window.innerWidth > 768) {
           deviceInfo.hasPhysicalKeyboard = true;
-        }
-        
-        // Update controls visibility based on device and keyboard
-        if (controls) {
-          if (deviceInfo.hasPhysicalKeyboard) {
-            // Has keyboard - hide touch controls
+          if (controls) controls.style.display = 'none';
+        } else {
+          // Mobile/tablet - show controls unless keyboard was explicitly detected
+          if (controls && deviceInfo.hasPhysicalKeyboard) {
             controls.style.display = 'none';
-          } else if (deviceInfo.type === 'mobile' || deviceInfo.type === 'tablet') {
-            // Mobile/tablet without keyboard - always show controls
+          } else if (controls) {
             controls.style.display = 'flex';
-          } else if (window.innerWidth <= 768) {
-            // Small screen without keyboard - show controls
-            controls.style.display = 'flex';
-          } else {
-            // Desktop size, assume keyboard exists
-            controls.style.display = 'none';
           }
         }
         
@@ -3837,31 +3858,39 @@
         var rotatePrompt = document.getElementById('rotatePrompt');
         if (!rotatePrompt) return;
         
-        // Only show rotation prompt on mobile/tablet devices
-        if (deviceInfo.type === 'mobile' || deviceInfo.type === 'tablet') {
-          var isPortrait = window.innerHeight > window.innerWidth;
-          var isLandscape = window.innerWidth > window.innerHeight;
-          
+        var isPortrait = window.innerHeight > window.innerWidth;
+        var isLandscape = window.innerWidth > window.innerHeight;
+        var isMobileSize = window.innerWidth <= 768;
+        
+        // Only manage rotation prompt on mobile-sized screens
+        if (isMobileSize) {
           if (isPortrait) {
             // Show rotation prompt in portrait mode
+            rotatePrompt.classList.remove('hide');
             rotatePrompt.classList.add('show');
-          } else {
+          } else if (isLandscape) {
             // Hide prompt in landscape mode
+            rotatePrompt.classList.add('hide');
             rotatePrompt.classList.remove('show');
             
             // Auto-fullscreen when rotated to landscape (if not already in fullscreen)
-            if (isLandscape && !document.fullscreenElement && 
+            if (!document.fullscreenElement && 
                 !document.webkitFullscreenElement && 
                 !document.mozFullScreenElement && 
                 !document.msFullscreenElement) {
               // Small delay to ensure rotation is complete
               setTimeout(function() {
-                toggleFullscreen();
+                try {
+                  toggleFullscreen();
+                } catch(e) {
+                  console.log('Fullscreen not available:', e);
+                }
               }, 300);
             }
           }
         } else {
-          // Desktop - never show rotation prompt
+          // Desktop - always hide rotation prompt
+          rotatePrompt.classList.add('hide');
           rotatePrompt.classList.remove('show');
         }
       }
