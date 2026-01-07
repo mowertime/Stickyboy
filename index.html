@@ -2518,10 +2518,19 @@
         try {
           anim = requestAnimationFrame(loop);
           
+          // Frame-rate independent timing (target 60 FPS)
+          if (!g._lastTime) g._lastTime = t;
+          var deltaTime = (t - g._lastTime) / (1000 / 60); // normalize to 60 FPS
+          g._lastTime = t;
+          
+          // Clamp delta time to avoid huge jumps (e.g., when tab is inactive)
+          if (deltaTime > 3) deltaTime = 1;
+          if (deltaTime < 0.1) deltaTime = 1;
+          
           // Update navigation grid periodically (every 10 frames)
           if (typeof updateNavigationGrid === 'function') {
             if (!g._gridUpdateCounter) g._gridUpdateCounter = 0;
-            g._gridUpdateCounter++;
+            g._gridUpdateCounter += deltaTime;
             if (g._gridUpdateCounter >= 10) {
               updateNavigationGrid(g.plat, g.cam, W, H);
               g._gridUpdateCounter = 0;
@@ -2539,12 +2548,12 @@
         var speedMul = 1 + ((g.upgrades && g.upgrades.speed) ? (0.08 * g.upgrades.speed) : 0);
         // apply speed boost if active
         if (p._speedBoost && p._speedBoost > 0) {
-          p._speedBoost--;
+          p._speedBoost -= deltaTime;
           speedMul *= 1.4; // 40% faster
         }
         // handle frozen state
         if (p.frozen > 0) {
-          p.frozen--;
+          p.frozen -= deltaTime;
           // frozen - can't control movement but still affected by gravity
           p.vx = 0;
         } else {
@@ -2555,7 +2564,7 @@
           } else if (g.k.right) {
             p.vx = baseSpeed;
             p.right = 1
-          } else p.vx *= .8
+          } else p.vx *= Math.pow(.8, deltaTime)
         }
         // jump handling uses class max jumps (can't jump when frozen)
         if (g.k.up && p.jl > 0 && p.frozen <= 0) {
@@ -2576,7 +2585,7 @@
           }
           // accumulate charge while holding
           if (p.charging) {
-            p.charge++;
+            p.charge += deltaTime;
             if (p.charge > p.chargeMax) p.charge = p.chargeMax;
           }
           // release: when attack key lifted and we were charging
@@ -2612,8 +2621,8 @@
           }
         }
         if (p.attackCd > 0) {
-          p.attackCd--;
-          if (p.attackCd == 0) p.canShoot = 1
+          p.attackCd -= deltaTime;
+          if (p.attackCd <= 0) p.canShoot = 1
         }
         if (g.k.swing && !p.swing && p.frozen <= 0) {
           p.swing = 1;
@@ -2621,20 +2630,20 @@
           attackSound()
         }
         if (p.swing) {
-          p.sf++;
+          p.sf += deltaTime;
           if (p.sf >= 15) {
             p.swing = 0;
             p.sf = 0
           }
         }
-        p.vy += .6;
-        p.y += p.vy;
-        p.x += p.vx;
+        p.vy += .6 * deltaTime;
+        p.y += p.vy * deltaTime;
+        p.x += p.vx * deltaTime;
         if (p.x < g.cam + 50) p.x = g.cam + 50;
         var tc = p.x - W * 0.4; // Center player at 40% from left (more centered)
         if (tc > g.cam) g.cam = tc;
-        if (Math.abs(p.vx) > .5) p.f += .5;
-        if (p.inv > 0) p.inv--;
+        if (Math.abs(p.vx) > .5) p.f += .5 * deltaTime;
+        if (p.inv > 0) p.inv -= deltaTime;
         p.gnd = 0;
         for (var i = 0; i < g.plat.length; i++) {
           var pl = g.plat[i];
@@ -2712,20 +2721,20 @@
                 }
               }
               
-              e.vy = (e.vy || 0) + 0.6;
-              e.y += e.vy;
-              e.x += e.vx;
+              e.vy = (e.vy || 0) + 0.6 * deltaTime;
+              e.y += e.vy * deltaTime;
+              e.x += e.vx * deltaTime;
             } else {
               // Stuck detection (like Minecraft mobs)
               if (Math.abs(e.x - (e._lastX || 0)) < 0.5) {
-                e._stuckTimer = (e._stuckTimer || 0) + 1;
+                e._stuckTimer = (e._stuckTimer || 0) + deltaTime;
               } else {
                 e._stuckTimer = 0;
               }
               e._lastX = e.x;
               
               // Recalculate path periodically or when stuck
-              e._recalcTimer = (e._recalcTimer || 0) - 1;
+              e._recalcTimer = (e._recalcTimer || 0) - deltaTime;
               if (e._recalcTimer <= 0 || e._stuckTimer > 30 || !e._platformPath) {
                 e._platformPath = findPlatformPathAStar(currentPlatIdx, targetPlatIdx, g.plat, true); // hunters can use spikes
                 e._pathIndex = 0;
@@ -2914,12 +2923,12 @@
               }
               
               // Cooldown tick
-              if (e.attackCooldown > 0) e.attackCooldown--;
+              if (e.attackCooldown > 0) e.attackCooldown -= deltaTime;
               
               // Apply physics
-              e.vy = (e.vy || 0) + 0.6;
-              e.y += e.vy;
-              e.x += e.vx;
+              e.vy = (e.vy || 0) + 0.6 * deltaTime;
+              e.y += e.vy * deltaTime;
+              e.x += e.vx * deltaTime;
             }
             
             // Landing detection and reset jumps
@@ -2945,7 +2954,7 @@
             var dx = p.x - e.x;
             
             // simple patrol
-            e.x += e.vx;
+            e.x += e.vx * deltaTime;
             if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
             
             // keep aligned to platform
@@ -2957,7 +2966,7 @@
             
             // shooting behavior: draw bow then fire at player periodically
             if (!e._drawing) {
-              e._shootCooldown--;
+              e._shootCooldown -= deltaTime;
               if (e._shootCooldown <= 0 && Math.abs(dx) < 500) {
                 // start drawing bow
                 e._drawing = true;
@@ -2966,8 +2975,8 @@
               }
             } else {
               // drawing bow
-              e._drawProgress++;
-              e.vx *= 0.95; // slow down while drawing
+              e._drawProgress += deltaTime;
+              e.vx *= Math.pow(0.95, deltaTime); // slow down while drawing
               
               if (e._drawProgress >= e._drawDuration) {
                 // release arrow
@@ -2999,8 +3008,8 @@
             }
             
             // apply physics
-            e.vy = (e.vy || 0) + 0.6;
-            e.y += e.vy;
+            e.vy = (e.vy || 0) + 0.6 * deltaTime;
+            e.y += e.vy * deltaTime;
             
             // landing detection
             e.gnd = 0;
@@ -3024,9 +3033,9 @@
               if (Math.abs(dx) > 30) {
                 e.vx = Math.sign(dx) * speed;
               } else {
-                e.vx *= 0.9; // slow down when close
+                e.vx *= Math.pow(0.9, deltaTime); // slow down when close
               }
-              e.x += e.vx;
+              e.x += e.vx * deltaTime;
               
               // keep on ceiling at fixed height above platform
               var plIdx = findPlatformIndexAtX(e.x, e.w);
@@ -3041,7 +3050,7 @@
               if (e.x + e.w > e.pr + 20) e.x = e.pr + 20 - e.w;
               
               // decide between shooting web or swinging
-              e._shootCooldown--;
+              e._shootCooldown -= deltaTime;
               if (e._shootCooldown <= 0 && Math.abs(p.x - e.x) < 400) {
                 var ex = e.x + e.w / 2;
                 var ey = e.y + e.h;
@@ -3093,14 +3102,14 @@
               }
             } else {
               // swinging attack
-              e._swingTimer--;
+              e._swingTimer -= deltaTime;
               
               // pendulum physics
-              var gravity = 0.003;
-              var damping = 0.995;
+              var gravity = 0.003 * deltaTime;
+              var damping = Math.pow(0.995, deltaTime);
               e._swingSpeed += Math.sin(e._swingAngle) * gravity;
               e._swingSpeed *= damping;
-              e._swingAngle += e._swingSpeed;
+              e._swingAngle += e._swingSpeed * deltaTime;
               
               // calculate spider position on swing using dynamic web length
               var swingLen = e._swingLen || 80;
@@ -3146,13 +3155,13 @@
             }
             
             if (e.attacking) {
-              e.attackFrame++;
+              e.attackFrame += deltaTime;
               // continue moving toward player during attack (slower)
               if (dist > 25) {
                 e.vx = Math.sign(dx) * 1.5;
-                e.x += e.vx;
+                e.x += e.vx * deltaTime;
               } else {
-                e.vx *= 0.7; // slow down when very close
+                e.vx *= Math.pow(0.7, deltaTime); // slow down when very close
               }
               
               // calculate weapon hitbox based on weapon type and attack frame
@@ -3218,15 +3227,15 @@
               if (dist < 150 && Math.abs(p.y - e.y) < 80) {
                 // chase player when in range
                 e.vx = Math.sign(dx) * 2;
-                e.x += e.vx;
+                e.x += e.vx * deltaTime;
               } else {
                 // normal patrol
-                e.x += e.vx;
+                e.x += e.vx * deltaTime;
                 if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
               }
             }
             
-            if (e.attackCooldown > 0) e.attackCooldown--;
+            if (e.attackCooldown > 0) e.attackCooldown -= deltaTime;
             
             // ensure y aligned to platform if possible
             var plIdx = findPlatformIndexAtX(e.x, e.w);
@@ -3280,9 +3289,9 @@
         // projectiles update & collisions
         for (var i = g.projectiles.length - 1; i >= 0; i--) {
           var pr = g.projectiles[i];
-          pr.x += pr.vx;
-          pr.y += (pr.vy || 0);
-          pr.life--;
+          pr.x += pr.vx * deltaTime;
+          pr.y += (pr.vy || 0) * deltaTime;
+          pr.life -= deltaTime;
           
           // player arrow hits enemies
           if (pr.type === 'arrow') {
@@ -3350,11 +3359,11 @@
         // powerup physics and collision
         for (var i = g.powerups.length - 1; i >= 0; i--) {
           var pu = g.powerups[i];
-          pu.life--;
-          pu.vy += 0.4; // gravity
-          pu.y += pu.vy;
-          pu.x += pu.vx;
-          pu.vx *= 0.98; // friction
+          pu.life -= deltaTime;
+          pu.vy += 0.4 * deltaTime; // gravity
+          pu.y += pu.vy * deltaTime;
+          pu.x += pu.vx * deltaTime;
+          pu.vx *= Math.pow(0.98, deltaTime); // friction
           
           // platform collision - bounce or land
           for (var j = 0; j < g.plat.length; j++) {
