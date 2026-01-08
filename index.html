@@ -1504,6 +1504,8 @@
         g.coins = 0;
         g.over = 0;
         g.start = 1;
+        g._lastTime = null; // Reset timing for deltaTime
+        g._gridUpdateCounter = 0;
         upSc();
         upHp();
         updateClassUI();
@@ -2519,13 +2521,17 @@
           anim = requestAnimationFrame(loop);
           
           // Frame-rate independent timing (target 60 FPS)
-          if (!g._lastTime) g._lastTime = t;
-          var deltaTime = (t - g._lastTime) / (1000 / 60); // normalize to 60 FPS
-          g._lastTime = t;
-          
-          // Clamp delta time to avoid huge jumps (e.g., when tab is inactive)
-          if (deltaTime > 3) deltaTime = 1;
-          if (deltaTime < 0.1) deltaTime = 1;
+          if (!g._lastTime) {
+            g._lastTime = t;
+            var deltaTime = 1; // First frame uses 1
+          } else {
+            var deltaTime = (t - g._lastTime) / (1000 / 60); // normalize to 60 FPS
+            g._lastTime = t;
+            
+            // Clamp delta time to avoid huge jumps (e.g., when tab is inactive)
+            if (deltaTime > 3) deltaTime = 1;
+            if (deltaTime < 0.1) deltaTime = 1;
+          }
           
           // Update navigation grid periodically (every 10 frames)
           if (typeof updateNavigationGrid === 'function') {

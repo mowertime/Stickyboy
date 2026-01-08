@@ -1,11 +1,13 @@
 # Hunter AI System - Grid-Based Pathfinding + Behavior Trees
 
 ## Overview
+
 The hunter AI now uses a sophisticated combination of **Grid-Based A* Pathfinding** and **Behavior Trees** for intelligent enemy navigation and decision-making.
 
 ## System Components
 
 ### 1. Grid-Based Navigation
+
 - **Grid Size**: 40x40 pixel cells overlay the game world
 - **Cell Types**:
   - `0` = Blocked/Spikes (unwalkable)
@@ -13,6 +15,7 @@ The hunter AI now uses a sophisticated combination of **Grid-Based A* Pathfindin
   - `2` = Air (jumpable)
 
 #### Grid Functions
+
 - `updateNavigationGrid()` - Updates grid based on current platforms (called every 10 frames)
 - `worldToGrid()` - Converts world coordinates to grid coordinates
 - `gridToWorld()` - Converts grid coordinates back to world position
@@ -20,23 +23,28 @@ The hunter AI now uses a sophisticated combination of **Grid-Based A* Pathfindin
 - `canGridJump()` - Determines if a jump between grid cells is possible
 
 ### 2. A* Pathfinding
+
 The `findGridPath()` function implements A* algorithm with:
+
 - **Walking neighbors**: Adjacent horizontal cells
 - **Jump neighbors**: Cells within jump range (up to 6 cells horizontal, 4 up, 6 down)
 - **Cost calculation**: Favors easier jumps (shorter distance, less climbing)
 - **Heuristic**: Manhattan distance for efficient pathfinding
 
 ### 3. Behavior Tree System
+
 Modular decision-making using composable nodes:
 
 #### Node Types
+
 - **Selector**: Returns success if ANY child succeeds (OR logic)
 - **Sequence**: Returns success only if ALL children succeed (AND logic)
 - **Condition**: Tests a boolean condition
 - **Action**: Executes a behavior
 
 #### Hunter Behavior Tree Structure
-```
+
+```text
 Selector (Priority-based)
 ├─ Sequence: Attack if close
 │  ├─ Condition: Is player within 50px?
@@ -51,6 +59,7 @@ Selector (Priority-based)
 ```
 
 ### 4. AI States
+
 The behavior tree manages these states:
 
 1. **CALCULATING_PATH**
@@ -85,6 +94,7 @@ The behavior tree manages these states:
 ## Debug Visualization
 
 Enable hunter debug mode to see:
+
 - **Green lines**: Grid-based path with waypoint nodes
 - **Yellow dashed line**: Current target vector
 - **State text**: Current AI state above each hunter
@@ -94,12 +104,14 @@ Toggle via Settings → "Show Hunter Pathfinding Debug"
 ## Advantages Over Previous System
 
 ### Old Platform-Based System
+
 - Limited to platform-to-platform jumps
 - Could get stuck on complex terrain
 - Required valid platform at exact location
 - Path could break when platforms removed
 
 ### New Grid-Based System
+
 ✅ Smooth navigation through complex terrain
 ✅ Can plan multi-jump sequences
 ✅ Handles dynamic platform changes gracefully
@@ -110,18 +122,21 @@ Toggle via Settings → "Show Hunter Pathfinding Debug"
 ## Technical Details
 
 ### Grid Resolution Trade-offs
+
 - **Larger cells (40px)**: Faster pathfinding, less precision
 - **Smaller cells**: More CPU intensive, smoother paths
 
 Current 40px size balances performance and accuracy for the game's scale.
 
 ### Jump Mechanics
+
 - **Max horizontal**: 6 grid cells (~240px)
 - **Max vertical up**: 4 grid cells (~160px)
 - **Max vertical down**: 6 grid cells (~240px)
 - **Double jump**: Available for hunters, used intelligently
 
 ### Memory Footprint
+
 - Grid recalculated periodically (not stored permanently)
 - Each hunter stores:
   - Current path array (~5-20 waypoints)
@@ -131,6 +146,7 @@ Current 40px size balances performance and accuracy for the game's scale.
 ## Future Enhancements
 
 Possible improvements:
+
 - Add more complex behaviors (flanking, retreat, group tactics)
 - Implement squad-based behavior trees
 - Add predictive aiming for ranged hunters

@@ -27,6 +27,7 @@ A fast-paced browser-based platformer game where you control a stickman running 
 ## How to Play
 
 ### Keyboard Controls
+
 - **Arrow Keys** or **A/D**: Move left/right
 - **Space** or **W/Up Arrow**: Jump
 - **Shift** or **E/K**: Attack/Shoot
@@ -34,11 +35,13 @@ A fast-paced browser-based platformer game where you control a stickman running 
 - **ESC**: Pause game
 
 ### Touch Controls (Mobile/Tablet)
+
 - On-screen buttons appear automatically on touch devices
 - Automatically hide when physical keyboard is detected
 - Works great with Bluetooth/external keyboards
 
 ### Tips
+
 - Avoid obstacles and spike platforms
 - Defeat enemies to collect coins and power-ups
 - Use the Archer's charge attack for maximum damage
@@ -60,6 +63,7 @@ Collect coins, defeat enemies, and survive as long as possible!
 ## AI System
 
 Hunter enemies use a sophisticated AI system combining:
+
 - **40x40 pixel navigation grid** overlaying the game world
 - **A* pathfinding algorithm** for optimal route planning
 - **Behavior Tree architecture** for intelligent decision-making
