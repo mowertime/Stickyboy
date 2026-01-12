@@ -1504,8 +1504,6 @@
         g.coins = 0;
         g.over = 0;
         g.start = 1;
-        g._lastTime = null; // Reset timing for deltaTime
-        g._gridUpdateCounter = 0;
         upSc();
         upHp();
         updateClassUI();
@@ -2521,17 +2519,13 @@
           anim = requestAnimationFrame(loop);
           
           // Frame-rate independent timing (target 60 FPS)
-          if (!g._lastTime) {
-            g._lastTime = t;
-            var deltaTime = 1; // First frame uses 1
-          } else {
-            var deltaTime = (t - g._lastTime) / (1000 / 60); // normalize to 60 FPS
-            g._lastTime = t;
-            
-            // Clamp delta time to avoid huge jumps (e.g., when tab is inactive)
-            if (deltaTime > 3) deltaTime = 1;
-            if (deltaTime < 0.1) deltaTime = 1;
-          }
+          if (!g._lastTime) g._lastTime = t;
+          var deltaTime = (t - g._lastTime) / (1000 / 60); // normalize to 60 FPS
+          g._lastTime = t;
+          
+          // Clamp delta time to avoid huge jumps (e.g., when tab is inactive)
+          if (deltaTime > 3) deltaTime = 1;
+          if (deltaTime < 0.1) deltaTime = 1;
           
           // Update navigation grid periodically (every 10 frames)
           if (typeof updateNavigationGrid === 'function') {
@@ -2733,14 +2727,14 @@
             } else {
               // Stuck detection (like Minecraft mobs)
               if (Math.abs(e.x - (e._lastX || 0)) < 0.5) {
-                e._stuckTimer = (e._stuckTimer || 0) + deltaTime;
+                e._stuckTimer = (e._stuckTimer || 0) + 1;
               } else {
                 e._stuckTimer = 0;
               }
               e._lastX = e.x;
               
               // Recalculate path periodically or when stuck
-              e._recalcTimer = (e._recalcTimer || 0) - deltaTime;
+              e._recalcTimer = (e._recalcTimer || 0) - 1;
               if (e._recalcTimer <= 0 || e._stuckTimer > 30 || !e._platformPath) {
                 e._platformPath = findPlatformPathAStar(currentPlatIdx, targetPlatIdx, g.plat, true); // hunters can use spikes
                 e._pathIndex = 0;
@@ -2960,7 +2954,7 @@
             var dx = p.x - e.x;
             
             // simple patrol
-            e.x += e.vx * deltaTime;
+            e.x += e.vx;
             if (e.x <= e.pl || e.x + e.w >= e.pr) e.vx *= -1;
             
             // keep aligned to platform
@@ -2972,7 +2966,7 @@
             
             // shooting behavior: draw bow then fire at player periodically
             if (!e._drawing) {
-              e._shootCooldown -= deltaTime;
+              e._shootCooldown--;
               if (e._shootCooldown <= 0 && Math.abs(dx) < 500) {
                 // start drawing bow
                 e._drawing = true;
@@ -2981,8 +2975,8 @@
               }
             } else {
               // drawing bow
-              e._drawProgress += deltaTime;
-              e.vx *= Math.pow(0.95, deltaTime); // slow down while drawing
+              e._drawProgress++;
+              e.vx *= 0.95; // slow down while drawing
               
               if (e._drawProgress >= e._drawDuration) {
                 // release arrow
@@ -3108,14 +3102,14 @@
               }
             } else {
               // swinging attack
-              e._swingTimer -= deltaTime;
+              e._swingTimer--;
               
               // pendulum physics
-              var gravity = 0.003 * deltaTime;
-              var damping = Math.pow(0.995, deltaTime);
+              var gravity = 0.003;
+              var damping = 0.995;
               e._swingSpeed += Math.sin(e._swingAngle) * gravity;
               e._swingSpeed *= damping;
-              e._swingAngle += e._swingSpeed * deltaTime;
+              e._swingAngle += e._swingSpeed;
               
               // calculate spider position on swing using dynamic web length
               var swingLen = e._swingLen || 80;
